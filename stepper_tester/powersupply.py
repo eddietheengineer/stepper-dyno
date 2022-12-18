@@ -1,3 +1,4 @@
+import time
 from riden import Riden
 r = Riden(port="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0", baudrate=115200, address=1)
 	

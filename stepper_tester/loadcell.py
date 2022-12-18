@@ -3,6 +3,7 @@ import time
 import sys
 import RPi.GPIO as GPIO
 from hx711 import HX711
+import numpy as np
 
 referenceUnit = 1085
 sampleCount = 5
@@ -23,17 +24,17 @@ def tare():
 
 def measure(sampleCount):
 	total = 0
+	measurements = []
 	for x in range(sampleCount):
 		val = hx.get_weight(5)
-		total = val + total
-		#hx.power_down()
-		#hx.power_up()
+		measurements.append(val)
 		time.sleep(0.1)
-	measurement = total / sampleCount
-	return measurement
+	#print(measurements)
+	median = np.median(measurements)
+	return median
 	#print("Load Cell Measurement")
 	
 def singleMeasure():
-	measurement = hx.get_weight(5)
+	measurement = -hx.get_weight(5)
 	return measurement
 	#print("Load Cell Measurement")

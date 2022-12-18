@@ -1,4 +1,4 @@
 def display(counter, label, data):
 	if(counter == 1):
-		print(label)
-	print(data)
+		print(str(label)[1:-1])
+	print(str(data)[1:-1])

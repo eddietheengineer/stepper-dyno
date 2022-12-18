@@ -13,12 +13,12 @@ import change_config
 import csvprocess
 import audio_capture
 
-model_number = 'LDO-42STH48-2504AC_16ms' #str(input('Model Number: ') or "17HS19-2004S1")
+model_number = 'LDO-42STH48-2804AC_16ms_2' #str(input('Model Number: ') or "17HS19-2004S1")
 step_angle = 1.8
 speed_start = 25 #int(input('Start Speed: ') or 50)
 speed_end = 3000 #int(input('Ending Speed: ') or 300)
 speed_step = 25 #int(input('Speed Step: ') or 50)
-tmc_start = 0.6 #float(input('TMC Current Start: ') or 0.5)
+tmc_start = 1.4 #float(input('TMC Current Start: ') or 0.5)
 tmc_end = 1.4 #float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.2 #float(input('TMC Current Step: ') or 0.1)
 voltage_start = 24
@@ -100,8 +100,7 @@ def main(argv=None):
 					f3 = executor.submit(loadcell.measure,7)
 					f2 = executor.submit(powersupply.scan)
 					f1 = executor.submit(scope_capture.captureAll,SAMPLE_TARGET,Cycle_Length_us)
-					#f4 = executor.submit(audio_capture.captureAudio,iterative_data)
-					#f5 = executor.submit(klipper_serial.readtemp)
+					f4 = executor.submit(audio_capture.captureAudio,iterative_data)
 
 				#Process Oscilloscope Data
 				oscilloscope_raw_data = f1.result()
@@ -129,14 +128,10 @@ def main(argv=None):
 				cycle_time = (time.time() - start_time)
 				cycle_data_label = ('cycle_time','TIME_MOVE','samples')
 				cycle_data = (round(cycle_time, 2), TIME_MOVE,len(oscilloscope_raw_data[0]))
-				
-				#Process Temperature
-				temperature_label = ('rpi_temp','driver_temp')
-				temperature_data = klipper_serial.readtemp()
 
 				#Combine Output Summary Data
-				output_data_label = iterative_data_label + powersupply_data_label + oscilloscope_data_label + mech_data_label+cycle_data_label + temperature_label
-				output_data = iterative_data + powersupply_data + oscilloscope_data + mech_data + cycle_data + temperature_data
+				output_data_label = iterative_data_label + powersupply_data_label + oscilloscope_data_label + mech_data_label+cycle_data_label
+				output_data = iterative_data + powersupply_data + oscilloscope_data + mech_data + cycle_data
 
 				#Write Header File Data to CSV File
 				if (testcounter == 1):

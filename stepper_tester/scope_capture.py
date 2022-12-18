@@ -1,6 +1,7 @@
 import pyvisa as visa
 import numpy as np
 import time
+import sys
 
 try:
     rm = visa.ResourceManager()
@@ -15,7 +16,7 @@ device.timeout = 30000
 	
 def configureScope(Time_Range):
 	U_sec = Time_Range / 7
-	U_sec_array  = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+	U_sec_array  = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,100000]
 	[idx, U_sec_set] = find_nearest(U_sec_array, U_sec)
 	Trig_delay = -U_sec_set*7
 	device.write('TDIV %dUS' % U_sec_set)
@@ -29,9 +30,20 @@ def find_nearest(array, value):
 	#	idx += 1
 	return [idx, array[idx]]
 	
-def captureAll(Sparsing, Samples,Time_Scale):
-	#Sparsing = 10000
-	#Samples = 10000
+def captureAll(Samples,Time_Scale):
+	u_sec_set = configureScope(Time_Scale)
+	#TIME_DIV = device.query('TDIV?')
+	#TIME_DIV = float(TIME_DIV[len('TDIV '):-2])
+	TIME_DIV = u_sec_set/1000000
+	Channel_Split = 1
+	
+	if(u_sec_set == 5000):
+		Sparsing = np.ceil(Time_Scale/(Samples/200))/Channel_Split
+	elif(u_sec_set == 2000):
+		Sparsing = np.ceil(Time_Scale/(Samples/500))/Channel_Split
+	else:
+		Sparsing = np.ceil(Time_Scale/(Samples/1000))/Channel_Split
+	
 	Channel = 1
 	VOLT_DIV = device.query(str.format('C%s:Volt_DIV?' % Channel))
 	VOLT_DIV = float(VOLT_DIV[len(str.format('C%s:VDIV ' % Channel)):-2])
@@ -56,7 +68,7 @@ def captureAll(Sparsing, Samples,Time_Scale):
 		else:
 			RESULT.append(item * VOLT_DIV/25 - VOLT_OFFSET)
 	
-	Channel = 2
+	Channel = 3
 	VOLT_DIV = device.query(str.format('C%s:Volt_DIV?' % Channel))
 	VOLT_DIV = float(VOLT_DIV[len(str.format('C%s:VDIV ' % Channel)):-2])
 	
@@ -83,9 +95,6 @@ def captureAll(Sparsing, Samples,Time_Scale):
 	SAMPLE_RATE = device.query('SARA?')
 	SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
 
-	TIME_DIV = device.query('TDIV?')
-	TIME_DIV = float(TIME_DIV[len('TDIV '):-2])
-
 	TRIG_DELAY = device.query('TRDL?')
 	TRIG_DELAY = -float(TRIG_DELAY[len('TRDL '):-2])
 
@@ -107,6 +116,6 @@ def captureAll(Sparsing, Samples,Time_Scale):
 	oscilloscope_trim_data = oscilloscope_raw_data[:,idx_start:idx_end]
 	return oscilloscope_trim_data
 	
-def param_calc():
-	Value = device.query('PACU RMS, C1')
-	print(Value)
+#def param_calc():
+#	Value = device.query('PACU RMS, C1')
+#	print(Value)
