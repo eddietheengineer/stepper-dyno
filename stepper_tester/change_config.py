@@ -5,14 +5,14 @@ def updateMS(microstep): # looping through the file
 
 	replaced_content = ""
 	i = 0
-	print(line_idx)
+	#print(line_idx)
 
 	for line in file:
 		line = line.strip()
     	# replacing the text if the line number is reached
 		if (i == line_idx):
 			new_line = "microsteps:%d" %microstep
-			print(new_line)
+			#print(new_line)
 		else:
 			new_line = line
 		

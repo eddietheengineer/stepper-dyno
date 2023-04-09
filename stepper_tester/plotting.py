@@ -3,31 +3,47 @@ import os
 
 def plotosData(output_data, TIME_AXIS, RESULT1, RESULT2):
 	Model_Number = output_data[0]
-	Index = output_data[1]
-	Voltage = output_data[2]
-	Current = output_data[3]
-	Speed = output_data[4]
+	Test_ID = output_data[1]
+	Test_Number = output_data[2]
+	Voltage = output_data[3]
+	Microstep = output_data[4]
+	Current = output_data[5]
+	Speed = output_data[6]
+	
+	Power = output_data[10]
+	Current_RMS = output_data[11]
+	Current_PkPk = output_data[12]
+	Torque = output_data[15]
+
+	Top_Line = str('Model: %s Test ID: %s Test Number: %d' % (Model_Number, Test_ID, Test_Number))
+	Middle_Line = str('Voltage: %d V, Microstep: %d, Current: %0.2f A, Speed: %d mm/s' % (Voltage, Microstep, Current, Speed))
+	Bottom_Line = str('Power: %0.1f, Current (RMS): %0.2f, Current (Peak): %0.2f, Torque: %0.1f' % (Power, Current_RMS, Current_PkPk, Torque))
+	
+	plotter.rcParams['figure.figsize'] = [8,4.5]
 	fig, ax1 = plotter.subplots()
 	ax2 = ax1.twinx()
-	ax1.plot(TIME_AXIS, RESULT1, linewidth = 1)
-	ax2.plot(TIME_AXIS, RESULT2, linewidth = 1, color = "orange")
-	plotter.title('Model: %s, Voltage: %d, Current: %0.1f, Speed: %d' % (Model_Number, Voltage, Current, Speed))
+	ax1.plot(TIME_AXIS, RESULT1, linewidth = 0.5, label = "Voltage")
+	ax2.plot(TIME_AXIS, RESULT2, linewidth = 0.5, label = "Current", color = "orange")
+	plotter.title('%s \n %s' % (Top_Line, Middle_Line))
 	ax1.set_xlabel("Time (ms)")
 	ax1.set_ylabel("Volts")
 	ax1.set_ylim([-60,60])
 	ax2.set_ylabel("Amps")
-	ax2.set_ylim([-2,2])
+	ax2.set_ylim([-3,3])
 
-	#plotter.legend()
+	lines, labels = ax1.get_legend_handles_labels()
+	lines2, labels2 = ax2.get_legend_handles_labels()
+	ax1.legend(lines + lines2, labels + labels2, loc=0)
+	
 	plotter.margins(0)
 	plotter.grid('True')
 	
-	filepath = '/home/pi/Desktop/%s/Test_Plots/' % Model_Number 
+	filepath = '/home/pi/Desktop/%s_%s/Oscilloscope_Plots/' % (Model_Number, Test_ID)
 	if not os.path.exists(filepath):
 		os.makedirs(filepath)
 	
-	filename = str(Model_Number) + "/Test_Plots/" + str(Model_Number) + "_" + str(Index)+"_"+str(Voltage)+"_"+str(Current)+"_"+str(Speed)
-	plotter.savefig('/home/pi/Desktop/%s.png' % filename, dpi=300)
+	filename = str(Model_Number) + "_" + str(Test_ID)+ "/Oscilloscope_Plots/" + str(Model_Number) + "_" + str(Test_ID) + "_"+ str(Test_Number)+"_"+str(Voltage)+"_"+str(Microstep)+"_"+str(Current)+"_"+str(Speed)
+	plotter.savefig('/home/pi/Desktop/%s.png' % filename, dpi=240)
 	plotter.clf()
 	plotter.close()
 	
