@@ -1,8 +1,8 @@
 import os
 	
-def writeheader(model_number, label):
-	filepath = '/home/pi/Desktop/%s/' % model_number 
-	csvfilepath = '/home/pi/Desktop/%s/%s_Summary.csv' % (model_number,model_number)
+def writeheader(model_number, test_id, label):
+	filepath = '/home/pi/Desktop/%s_%s/' % (model_number, test_id)
+	csvfilepath = '/home/pi/Desktop/%s_%s/%s_Summary.csv' % (model_number, test_id,model_number)
 
 	if not os.path.exists(filepath):
 		os.makedirs(filepath)
@@ -12,8 +12,8 @@ def writeheader(model_number, label):
 			file.write(str(label)[1:-1]+'\n')
 	file.close()
 	
-def writedata(model_number, data):
-	csvfilepath = '/home/pi/Desktop/%s/%s_Summary.csv' % (model_number, model_number)
+def writedata(model_number, test_id, data):
+	csvfilepath = '/home/pi/Desktop/%s_%s/%s_Summary.csv' % (model_number, test_id, model_number)
 	with open(csvfilepath, "a") as file:
 		file.write(str(data)[1:-1]+'\n')
 	file.close()
