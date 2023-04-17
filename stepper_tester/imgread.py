@@ -3,7 +3,7 @@ import os
 import imageio
 from natsort import natsorted, ns
 
-png_dir = '/home/pi/Desktop/17HM19-2004S1/'
+png_dir = '/home/pi/Desktop/LDO_42STH48-2504AC_TX2/Oscilloscope_Plots/'
 images = []
 list_png = natsorted(os.listdir(png_dir))
 #print(list_png)
@@ -16,4 +16,4 @@ for file_name in list_png:
 #for _ in range(10):
 #    images.append(imageio.imread(file_path))
 
-imageio.mimsave('/home/pi/Desktop/17HM19-2004S1/17HM19-2004S1.gif', images,fps=10)
+imageio.mimsave('/home/pi/Desktop/LDO_42STH48-2504AC_TX2/LDO_42STH48-2504AC_5fps.gif', images,fps=5)

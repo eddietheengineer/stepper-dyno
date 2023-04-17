@@ -14,29 +14,27 @@ import csvprocess
 import audio_capture
 
 model_number = 'LDO_42STH48-2504AC' #str(input('Model Number: ') or "17HS19-2004S1")
-test_id = 'T1'
+test_id = 'TX2'
 step_angle = 1.8
-speed_start = 25 #int(input('Start Speed: ') or 50)
+
+speed_start = 50 #int(input('Start Speed: ') or 50)
 speed_end = 3000 #int(input('Ending Speed: ') or 300)
-speed_step = 25 #int(input('Speed Step: ') or 50)
-tmc_start = 0.2 #float(input('TMC Current Start: ') or 0.5)
-tmc_end = 2.4 #float(input('TMC Current End: ') or 1.0)
+speed_step = 50 #int(input('Speed Step: ') or 50)
+
+tmc_start = 0.6#float(input('TMC Current Start: ') or 0.5)
+tmc_end = 2.0 #float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.2 #float(input('TMC Current Step: ') or 0.1)
-microstep_array = [1, 2, 4, 8, 16, 32, 64, 128]
 tmc_array_5160 = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
+
+#microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
+microstep_array = [16]
+
 voltage_start = 12
 voltage_end = 48
 voltage_step = 12
 
 ACCELERATION = 10000
 SAMPLE_TARGET = 500000
-
-powersupply.initialize(voltage_start)
-change_config.updateMS(16)
-klipper_serial.restart()
-time.sleep(1)
-loadcell.tare()
-print(loadcell.measure(5))
 
 global TIME_MOVE
 TIME_MOVE = 10
@@ -48,29 +46,31 @@ failcount = 0
 global cycle_time
 cycle_time = 0
 
-def find_closest(array, target):
-    return min(array, key=lambda x: abs(x - target))
 
 def main(argv=None):
+	
+	initialize_dyno(voltage_start)
 				
 	for voltage_setting in range(voltage_start, voltage_end+voltage_step, voltage_step):
+		
 		#Set Power Supply Voltage
 		powersupply.voltage_setting(voltage_setting)
-		
-		#Wait 5 second for Output Voltage to stabilize (removed due to wait in microstep)
-		
+				
 		for microstep_i in range(len(microstep_array)):
-			#Set Microstep value
+			
+			#Set Microsteps
 			change_config.updateMS(microstep_array[microstep_i])
 			klipper_serial.restart()
 			time.sleep(10)
 		
 			for tmc_currentx10 in range (int(tmc_start*10), int(tmc_end*10)+int(tmc_step*10), int(tmc_step*10)):
+				
 				#Set TMC Driver Current
 				tmc_current = find_closest(tmc_array_5160, tmc_currentx10/10)
 				klipper_serial.current(tmc_current)
 			
 				for speed in range(speed_start, speed_end+speed_step, speed_step):
+					
 					global TIME_MOVE
 					global testcounter
 					global failcount
@@ -79,18 +79,16 @@ def main(argv=None):
 					#If previous move was longer than cycle time, delay until move is completed
 					if (cycle_time < TIME_MOVE)and(testcounter>1):
 						time_delay = TIME_MOVE - cycle_time
-						#print(time_delay)
 						time.sleep(time_delay+1)
 				
 					#Set new move to the same as the previous move, plus a small buffer of 0.5 sec
 					if (testcounter>1):
 						TIME_MOVE = 10 #np.ceil(cycle_time)+1
-						#print(TIME_MOVE)
 								
 					#Initiate Capture Timer
 					start_time = time.time()
 				
-					#Calculate length of 1 cycle
+					#Calculate length of 1 Cycle
 					Cycle_Length_us = round(4*step_angle/(speed/40*365)*1000*1000,0)
 				
 					#Start Stepper Motor
@@ -100,8 +98,9 @@ def main(argv=None):
 					iterative_data_label = ('model_number','test_id','test_counter','voltage_setting', 'microstep','tmc_current', 'speed')
 					iterative_data = (model_number, test_id, testcounter, voltage_setting, microstep_array[microstep_i], tmc_current, speed)
 				
-					#Wait for stepper to accelerate
+					#Wait for Stepper to accelerate
 					time.sleep(speed/ACCELERATION)
+					
 					#time.sleep(1)
 					#audio_capture.captureAudio(iterative_data)
 					#time.sleep(1)
@@ -110,7 +109,7 @@ def main(argv=None):
 					with concurrent.futures.ThreadPoolExecutor() as executor:
 						f3 = executor.submit(loadcell.measure,7)
 						f2 = executor.submit(powersupply.scan)
-						f1 = executor.submit(scope_capture.captureAll,SAMPLE_TARGET,Cycle_Length_us)
+						f1 = executor.submit(scope_capture.captureAllSingle,SAMPLE_TARGET,Cycle_Length_us,voltage_setting,tmc_current)
 						#f4 = executor.submit(audio_capture.captureAudio,iterative_data)
 						#f5 = executor.submit(klipper_serial.readtemp)
 
@@ -181,13 +180,28 @@ def main(argv=None):
 
 			
 				###End Current Iteration
-	final_time = time.time() - initial_time
+
+	csvprocess.plotSummaryData(model_number)
+	shutdown_dyno()
+
+
+def initialize_dyno(voltage):
+	powersupply.initialize(voltage_start)
+	klipper_serial.restart()
+	time.sleep(1)
+	loadcell.tare()
+	
+def shutdown_dyno():
 	powersupply.close()
 	klipper_serial.restart()
 	loadcell.close()
-	csvprocess.plotSummaryData(model_number)
-	print("Finished: Library closed, resources released. Final Time: %0.2f" % final_time)
+	print("Finished: Library closed, resources released")
+
+
+def find_closest(array, target):
+    return min(array, key=lambda x: abs(x - target))
 
 if __name__ == "__main__":
 	import sys
 	sys.exit(main())
+	
