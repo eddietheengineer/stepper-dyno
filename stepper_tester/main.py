@@ -14,22 +14,22 @@ import csvprocess
 import audio_capture
 
 model_number = 'LDO_42STH48-2504AC' #str(input('Model Number: ') or "17HS19-2004S1")
-test_id = 'TX2'
+test_id = '4.22.23_Full'
 step_angle = 1.8
 
 speed_start = 50 #int(input('Start Speed: ') or 50)
 speed_end = 3000 #int(input('Ending Speed: ') or 300)
 speed_step = 50 #int(input('Speed Step: ') or 50)
 
-tmc_start = 0.6#float(input('TMC Current Start: ') or 0.5)
-tmc_end = 2.0 #float(input('TMC Current End: ') or 1.0)
+tmc_start = 1.0#float(input('TMC Current Start: ') or 0.5)
+tmc_end = 2.4 #float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.2 #float(input('TMC Current Step: ') or 0.1)
 tmc_array_5160 = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 
 #microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
 microstep_array = [16]
 
-voltage_start = 12
+voltage_start =48
 voltage_end = 48
 voltage_step = 12
 
@@ -120,6 +120,14 @@ def main(argv=None):
 					current_pkpk = round((current_max - current_min)/2,2)
 					rms_current = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
 					rms_voltage = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
+					
+					power_scaled = oscilloscope_raw_data[3]
+					power_max = round(np.percentile(power_scaled,90),2)
+					power_average = round(np.average(power_scaled),2)
+					
+					electrical_power_label = ('power_max', 'power_average')
+					electrical_power_data = (power_max, power_average)
+
 					oscilloscope_data_label = ('rms_current', 'current_pkpk', 'rms_voltage')
 					oscilloscope_data = (rms_current, current_pkpk, rms_voltage)
 
@@ -145,8 +153,8 @@ def main(argv=None):
 					temperature_data = klipper_serial.readtemp()
 
 					#Combine Output Summary Data
-					output_data_label = iterative_data_label + powersupply_data_label + oscilloscope_data_label + mech_data_label+cycle_data_label + temperature_label
-					output_data = iterative_data + powersupply_data + oscilloscope_data + mech_data + cycle_data + temperature_data
+					output_data_label = iterative_data_label + powersupply_data_label + oscilloscope_data_label + mech_data_label+cycle_data_label + temperature_label + electrical_power_label
+					output_data = iterative_data + powersupply_data + oscilloscope_data + mech_data + cycle_data + temperature_data + electrical_power_data
 
 					#Write Header File Data to CSV File
 					if (testcounter == 1):
@@ -162,18 +170,14 @@ def main(argv=None):
 						failcount = 0
 						break
 					else:
-						#Plot Oscilloscope Data if motor hasn't stalled
-						plotting.plotosData(output_data, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2])
-					
 						#Write to CSV File
 						csv_logger.writedata(model_number, test_id, output_data)
 					
 						#Write Output Data to Terminal
 						terminal_display.display(testcounter, output_data_label, output_data)
-					
-						#Write Output Data to Array
-						#full_array = np.append(full_array, output_data, axis=0)
-						#print(full_array)
+						if (failcount == 0):
+							#Plot Oscilloscope Data if motor hasn't stalled
+							plotting.plotosData(output_data, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2],power_scaled)
 
 					###End Speed Iteration
 					testcounter += 1
@@ -181,7 +185,7 @@ def main(argv=None):
 			
 				###End Current Iteration
 
-	csvprocess.plotSummaryData(model_number)
+	#csvprocess.plotSummaryData(model_number)
 	shutdown_dyno()
 
 
@@ -203,5 +207,6 @@ def find_closest(array, target):
 
 if __name__ == "__main__":
 	import sys
+	#shutdown_dyno()
 	sys.exit(main())
 	

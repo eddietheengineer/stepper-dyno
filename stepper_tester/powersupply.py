@@ -4,13 +4,10 @@ r = Riden(port="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0", baudrate=1152
 	
 def scan():
 	return (r.get_v_set(), r.get_v_out(), r.get_i_out(), r.get_p_out())
-	#print("Riden Scanned")
 	
 def voltage_setting(voltage):
 	r.set_v_set(voltage)
 	r.set_output(1)
-	return r.get_v_set()
-	#print("Voltage Set")
 	
 def initialize(voltage):
 	r.set_v_set(voltage)
