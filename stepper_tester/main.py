@@ -115,21 +115,19 @@ def main(argv=None):
 
 					#Process Oscilloscope Data
 					oscilloscope_raw_data = f1.result()
-					current_max = np.percentile(oscilloscope_raw_data[2],95)
-					current_min = np.percentile(oscilloscope_raw_data[2],5)
-					current_pkpk = round((current_max - current_min)/2,2)
 					rms_current = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
-					rms_voltage = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
 					
-					power_scaled = oscilloscope_raw_data[3]
-					power_max = round(np.percentile(power_scaled,90),2)
-					power_average = round(np.average(power_scaled),2)
+					[current_rms, current_pkpk, voltage_rms, voltage_pkpk] = scope_capture.parameterMeasureRead()
+					
+					power_raw = oscilloscope_raw_data[3]
+					power_max = round(np.percentile(power_raw,90),2)
+					power_average = round(np.average(power_raw)*2,2)
 					
 					electrical_power_label = ('power_max', 'power_average')
 					electrical_power_data = (power_max, power_average)
 
 					oscilloscope_data_label = ('rms_current', 'current_pkpk', 'rms_voltage')
-					oscilloscope_data = (rms_current, current_pkpk, rms_voltage)
+					oscilloscope_data = (current_rms, current_pkpk, voltage_rms)
 
 					#Process Load Cell Data
 					grams = f3.result()
@@ -177,7 +175,7 @@ def main(argv=None):
 						terminal_display.display(testcounter, output_data_label, output_data)
 						if (failcount == 0):
 							#Plot Oscilloscope Data if motor hasn't stalled
-							plotting.plotosData(output_data, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2],power_scaled)
+							plotting.plotosData(output_data, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2],oscilloscope_raw_data[3])
 
 					###End Speed Iteration
 					testcounter += 1

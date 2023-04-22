@@ -237,7 +237,9 @@ def collectOscilloscopeData():
 	
 def parseOscilloscopeResponse(response):
 	#match = re.search(r'\s([-+]?\d*\.\d+(?:[Ee][-+]?\d+)?)\w', response)
-	match = re.search(r'\s([-+]?\d*\.?\d+(?:[eE][-+]?\d+))', response)
+	#match = re.search(r'\s([-+]?\d*\.?\d+(?:[eE][-+]?\d+))', response)
+	#rmsVoltage
+	match = re.search(r'([-+]?\d*\.\d+([eE][-+]?\d+)?)', response)
 
 	if match:
 		processedResponse = float(match.group(1))
@@ -276,27 +278,23 @@ def parameterMeasureStart():
 	device.write('PARAMETER_CLR')
 	
 	device.write(f'PARAMETER_CUSTOM RMS, C{VOLTAGE_CHANNEL}')
-	#device.write(f'PARAMETER_CUSTOM PKPK, C{VOLTAGE_CHANNEL}')
+	device.write(f'PARAMETER_CUSTOM PKPK, C{VOLTAGE_CHANNEL}')
 	
 	#Set Up Current measurement:
 	device.write(f'PARAMETER_CUSTOM RMS, C{CURRENT_CHANNEL}')
-	#device.write(f'PARAMETER_CUSTOM PKPK, C{CURRENT_CHANNEL}')
+	device.write(f'PARAMETER_CUSTOM PKPK, C{CURRENT_CHANNEL}')
 		
 	#Set Up Math Measurement
 	device.write("'DEFINE_EQN, 'C1*C3'")
 
 def parameterMeasureRead():
 	#Read Voltage
-	volt_rms = device.query(f'C{VOLTAGE_CHANNEL}:PARAMETER_VALUE? RMS')
-	#volt_pk = device.query(f'C{VOLTAGE_CHANNEL}:PARAMETER_VALUE? PKPK')
+	volt_rms = parseOscilloscopeResponse(device.query(f'C{VOLTAGE_CHANNEL}:PARAMETER_VALUE? RMS'))
+	volt_pk = parseOscilloscopeResponse(device.query(f'C{VOLTAGE_CHANNEL}:PARAMETER_VALUE? PKPK'))
 	
 	#Read Current
-	current_rms = device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? RMS')
-	#current_pk = device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? PKPK')
-	
-	#Read Math
-	#power_rms = device.query('MATH:PARAMETER_VALUE? RMS')
-	
-	return volt_rms, current_rms
+	current_rms = parseOscilloscopeResponse(device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? RMS'))
+	current_pk = parseOscilloscopeResponse(device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? PKPK'))
+	return volt_rms, volt_pk, current_rms, current_pk
 	
 setupScope()
