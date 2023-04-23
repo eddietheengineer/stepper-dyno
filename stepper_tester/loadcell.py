@@ -31,7 +31,8 @@ def measure(sampleCount):
 		time.sleep(0.1)
 	filtered_data = reject_range_outliers(np.array(measurements))
 	average = np.average(filtered_data)
-	return average
+	loadcelltime = time.perf_counter()-start
+	return average, loadcelltime
     
 def reject_range_outliers(data, range=0.5):
     d = np.abs(data - np.median(data))

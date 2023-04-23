@@ -15,16 +15,16 @@ import audio_capture
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC' #str(input('Model Number: ') or "17HS19-2004S1")
-test_id = '4.22.23_Full'
+test_id = '4.23.23a'
 step_angle = 1.8
 
 speed_start = 100 #int(input('Start Speed: ') or 50)
-speed_end = 200 #int(input('Ending Speed: ') or 300)
+speed_end = 3000 #int(input('Ending Speed: ') or 300)
 speed_step = 100 #int(input('Speed Step: ') or 50)
 
 tmc_start = 1.0#float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.0 #float(input('TMC Current End: ') or 1.0)
-tmc_step = 1.0 #float(input('TMC Current Step: ') or 0.1)
+tmc_step = 0.2 #float(input('TMC Current Step: ') or 0.1)
 tmc_array_5160 = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 
 #microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
@@ -47,31 +47,35 @@ failcount = 0
 global cycle_time
 cycle_time = 0
 
-@dataclass
-class TestPointData():
-	stepper_model: str
-	test_id: str
-	test_counter: int
-	test_voltage: int
-	test_microstep: int
-	test_current: float
-	test_speed: int
-	powerSupplyVoltage_v: float
-	powerSupplyCurrent_a: float
-	powerSupplyPower_w: float
-	oscilloscopeCurrentRms_a: float
-	oscilloscopeCurrentPeak_a: float
-	oscilloscopeVoltageRms_v: float
-	oscilloscopePower_w: float
-	oscilloscopeSampleCount: int
-	loadCellLoad_g: float
-	loadCellTorque_ncm: float
-	loadCellMotorOutputPower_w: float
-	temperaturePi_c: float
-	temperatureDriver_c: float
-	temperatureStepper_c: float
-	cycleTime_s: float
-	moveTime_s: float
+output_data_label_previous = []
+output_data_previous = []
+oscilloscope_raw_data_previous = []
+
+# @dataclass
+# class TestPointData():
+# 	stepper_model: str
+# 	test_id: str
+# 	test_counter: int
+# 	test_voltage: int
+# 	test_microstep: int
+# 	test_current: float
+# 	test_speed: int
+# 	powerSupplyVoltage_v: float
+# 	powerSupplyCurrent_a: float
+# 	powerSupplyPower_w: float
+# 	oscilloscopeCurrentRms_a: float
+# 	oscilloscopeCurrentPeak_a: float
+# 	oscilloscopeVoltageRms_v: float
+# 	oscilloscopePower_w: float
+# 	oscilloscopeSampleCount: int
+# 	loadCellLoad_g: float
+# 	loadCellTorque_ncm: float
+# 	loadCellMotorOutputPower_w: float
+# 	temperaturePi_c: float
+# 	temperatureDriver_c: float
+# 	temperatureStepper_c: float
+# 	cycleTime_s: float
+# 	moveTime_s: float
 	
 
 def main(argv=None):
@@ -127,7 +131,7 @@ def main(argv=None):
 					iterative_data = (model_number, test_id, testcounter, voltage_setting, microstep_array[microstep_i], tmc_current, speed)
 				
 					#Wait for Stepper to accelerate
-					time.sleep(speed/ACCELERATION)
+					time.sleep(speed/ACCELERATION+0.5)
 					
 					#time.sleep(1)
 					#audio_capture.captureAudio(iterative_data)
@@ -137,39 +141,39 @@ def main(argv=None):
 					with concurrent.futures.ThreadPoolExecutor() as executor:
 						f3 = executor.submit(loadcell.measure,7) #3.2 sec, 2.4 thread time
 						f2 = executor.submit(powersupply.measure,10) #2.18 sec, 0.01 sec thread time
-						f1 = executor.submit(scope_capture.captureAllSingle,SAMPLE_TARGET,Cycle_Length_us,voltage_setting,tmc_current)
+						f1 = executor.submit(scope_capture.captureAllSingle,SAMPLE_TARGET,Cycle_Length_us)
 						#f4 = executor.submit(audio_capture.captureAudio,iterative_data)
 						#f5 = executor.submit(klipper_serial.readtemp)
 
 					#Process Oscilloscope Data
-					oscilloscope_raw_data = f1.result()
+					[oscilloscope_raw_data, os_time] = f1.result()
+										
+					#Process Oscilloscope Data
+					current_max = np.percentile(oscilloscope_raw_data[2],95)
+					current_min = np.percentile(oscilloscope_raw_data[2],5)
+					current_pkpk = round((current_max - current_min)/2,2)
 					
-					[voltage_rms, voltage_pkpk, current_rms, current_pkpk] = scope_capture.parameterMeasureRead()
-					
-					power_raw = oscilloscope_raw_data[3]
+					current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
+					voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
+									
+					power_raw = np.multiply(oscilloscope_raw_data[1],oscilloscope_raw_data[2])
 					power_max = round(np.percentile(power_raw,90),2)
 					power_average = round(np.average(power_raw)*2,2)
-					
-					power_raw_os = np.multiply(oscilloscope_raw_data[1],oscilloscope_raw_data[2])
-					power_max_os = round(np.percentile(power_raw_os,90),2)
-					power_average_os = round(np.average(power_raw_os)*2,2)
-					
-					print(f'OS: {power_average}W, Calc: {power_average_os}W')
-					print(f'OS: {power_max}W, Calc: {power_max_os}W')
 
 					oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk', 'power_average', 'power_max')
 					oscilloscope_data = (voltage_rms, current_rms, current_pkpk, power_average, power_max)
 
 					#Process Load Cell Data
-					grams = f3.result()
+					[grams, loadcell_time] = f3.result()
 					torque = grams / 1000 * 9.81 * 135 / 10
 					motor_power = torque / 100 * speed * 2 * 3.1415/40
 					mech_data_label = ('grams','torque', 'motor_power')
 					mech_data = (round(grams,3),round(torque,3), round(motor_power,3))
 				
 					#Process Power Supply Data
+					[voltage_actual, power_actual, powersupply_time] = f2.result()
 					powersupply_data_label = ('v_supply', 'p_supply')
-					powersupply_data = f2.result()
+					powersupply_data = (voltage_actual, power_actual)
 				
 					#Process Temperature
 					temperature_label = ('rpi_temp','driver_temp','stepper_temp')
@@ -203,9 +207,11 @@ def main(argv=None):
 					
 						#Write Output Data to Terminal
 						terminal_display.display(testcounter, output_data_label, output_data)
+						
 						if (failcount == 0):
-							#Plot Oscilloscope Data if motor hasn't stalled
-							plotting.plotosData(output_data, output_data_label, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2],oscilloscope_raw_data[3])
+ 							#Plot Oscilloscope Data if motor hasn't stalled
+ 							plot_time = plotting.plotosData(output_data, output_data_label, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2], power_raw)
+ 							#print(f'      Total: {cycle_time:0.2f}, PS: {powersupply_time:0.2f}, Load: {loadcell_time:0.2f}, OS: {os_time:0.2f}, PlotTime: {plot_time:0.2f}')
 
 					###End Speed Iteration
 					testcounter += 1

@@ -7,6 +7,7 @@ def scan():
 	return (riden.get_v_set(), riden.get_v_out(), riden.get_i_out(), riden.get_p_out())
 
 def measure(sampleCount):
+	start = time.perf_counter()
 	measurements_power = []
 	for x in range(sampleCount):
 		val = riden.get_p_out()
@@ -14,7 +15,8 @@ def measure(sampleCount):
 		time.sleep(0.1)
 	filtered_data = reject_range_outliers(np.array(measurements_power))
 	average_power = round(np.average(filtered_data),2)
-	return riden.get_v_out(), average_power
+	powersupplytime = time.perf_counter() - start
+	return riden.get_v_out(), average_power, powersupplytime
 
 def reject_range_outliers(data, range=0.2):
     d = np.abs(data - np.median(data))

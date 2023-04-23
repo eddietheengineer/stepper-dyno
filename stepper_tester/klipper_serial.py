@@ -11,7 +11,7 @@ def current(amps):
 	ser = serial.Serial("/home/pi/printer_data/comms/klippy.serial", baudrate=250000)
 	current_command = "SET_TMC_CURRENT STEPPER=stepper_M3 CURRENT=" + str(amps) + "\n"
 	ser.write(str.encode(current_command))
-	print(f'      Set TMC Current: {amps}')
+	print(f'      Set TMC Current: {amps}A')
 	ser.close()
 
 def move(time, speed, acceleration):

@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plotter
-import os		
+import os
+import time
 
 def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
+	start_time = time.perf_counter()
 	Model_Number = output_data[index_data.index('model_number')]
 	Test_ID = output_data[index_data.index('test_id')]
 	Test_Number = output_data[index_data.index('test_counter')]
@@ -51,6 +53,8 @@ def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
 	plotter.savefig('/home/pi/Desktop/%s.png' % filename, dpi=240)
 	plotter.clf()
 	plotter.close()
+	plot_time = time.perf_counter() - start_time
+	return plot_time
 	
 def plotSummaryData(output_data):
 	Model_Number = output_data[0]
