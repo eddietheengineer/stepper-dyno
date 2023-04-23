@@ -1,19 +1,19 @@
 import matplotlib.pyplot as plotter
 import os		
 
-def plotosData(output_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
-	Model_Number = output_data[0]
-	Test_ID = output_data[1]
-	Test_Number = output_data[2]
-	Voltage = output_data[3]
-	Microstep = output_data[4]
-	Current = output_data[5]
-	Speed = output_data[6]
+def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
+	Model_Number = output_data[index_data.index('model_number')]
+	Test_ID = output_data[index_data.index('test_id')]
+	Test_Number = output_data[index_data.index('test_counter')]
+	Voltage = output_data[index_data.index('voltage_setting')]
+	Microstep = output_data[index_data.index('microstep')]
+	Current = output_data[index_data.index('tmc_current')]
+	Speed = output_data[index_data.index('speed')]
 	
-	Power = output_data[10]
-	Current_RMS = output_data[11]
-	Current_PkPk = output_data[12]
-	Torque = output_data[15]
+	Power = output_data[index_data.index('p_supply')]
+	Current_RMS = output_data[index_data.index('current_rms')]
+	Current_PkPk = output_data[index_data.index('current_pkpk')]
+	Torque = output_data[index_data.index('torque')]
 
 	Top_Line = str('Model: %s Test ID: %s Test Number: %d' % (Model_Number, Test_ID, Test_Number))
 	Middle_Line = str('Voltage: %d V, Microstep: %d, Current: %0.2f A, Speed: %d mm/s' % (Voltage, Microstep, Current, Speed))

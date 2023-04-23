@@ -14,27 +14,29 @@ hx.set_reference_unit(referenceUnit)
 hx.reset()
 
 def close():
-    print("Cleaning Loadcell")
+    print("      Cleaning Loadcell")
     GPIO.cleanup()
     
 def tare():
 	hx.reset()
 	hx.tare()
-	print("Tared Loadcell")
+	print("      Tared Loadcell")
 
 def measure(sampleCount):
-	total = 0
+	start = time.perf_counter()
 	measurements = []
 	for x in range(sampleCount):
 		val = hx.get_weight(5)
 		measurements.append(val)
 		time.sleep(0.1)
-	#print(measurements)
-	median = np.median(measurements)
-	return median
-	#print("Load Cell Measurement")
+	filtered_data = reject_range_outliers(np.array(measurements))
+	average = np.average(filtered_data)
+	return average
+    
+def reject_range_outliers(data, range=0.5):
+    d = np.abs(data - np.median(data))
+    return data[d < range]
 	
 def singleMeasure():
-	measurement = -hx.get_weight(5)
+	measurement = hx.get_weight(5)
 	return measurement
-	#print("Load Cell Measurement")

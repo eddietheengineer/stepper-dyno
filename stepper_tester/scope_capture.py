@@ -1,5 +1,6 @@
 import pyvisa as visa
 import numpy as np
+import math as math
 import time
 import sys
 import re
@@ -8,6 +9,26 @@ TOTAL_CHANNELS = 4
 CURRENT_CHANNEL = 3
 VOLTAGE_CHANNEL = 1
 
+#Oscilloscope Settings:
+global TIME_DIV
+TIME_DIV = 0
+global TRIG_DELAY
+TRIG_DELAY = 0
+global VOLT_DIV
+VOLT_DIV = 0
+global AMP_DIV
+AMP_DIV = 0
+global MATH_DIV
+MATH_DIV = 0
+global VOLT_OFFSET
+VOLT_OFFSET = 0
+global AMP_OFFSET
+AMP_OFFSET = 0
+global MATH_OFFSET
+MATH_OFFSET = 0
+
+
+
 try:
     rm = visa.ResourceManager()
     # Connect to device (Make sure to change the resource locator!)
@@ -15,7 +36,7 @@ try:
     device = rm.open_resource('TCPIP::10.10.10.163::INSTR',query_delay=0.25)
 
 except:
-    print('Failed to connect to oscilloscope')
+    print('      Failed to connect to oscilloscope')
     sys.exit(0)
 device.timeout = 30000
 
@@ -29,7 +50,7 @@ def startChannels():
 			#print(f'{i} is OFF')
 	
 def setupScope():
-	print('Connected to oscilloscope')
+	print('      Connected to Oscilloscope')
 	startChannels()
 	
 	#use sampling instead of average
@@ -58,7 +79,7 @@ def setupScope():
 	#Set Voltage Channel to DC Coupling
 	device.write(f'C{VOLTAGE_CHANNEL}:COUPLING D1M')
 	#Set Voltage Channel Vertical Offset to 0
-	device.write(f'C{VOLTAGE_CHANNEL}:OFFSET 0V')
+	device.write(f'C{VOLTAGE_CHANNEL}:OFFSET {VOLT_OFFSET}V')
 	
 	#Set Current Channel to Amps
 	device.write(f'C{CURRENT_CHANNEL}:UNIT A')
@@ -67,11 +88,19 @@ def setupScope():
 	#Set Current Channel to DC Coupling
 	device.write(f'C{CURRENT_CHANNEL}:COUPLING D1M')
 	#Set Current Channel Vertical Offset to 0V
-	device.write(f'C{CURRENT_CHANNEL}:OFFSET 0V')
+	device.write(f'C{CURRENT_CHANNEL}:OFFSET {AMP_OFFSET}V')
+	
+	#Set Math Vertical Offset to 0V
+	device.write('MATH_VERT_POS {MATH_OFFSET}')
+	
+	#Set Buzzer Off
+	device.write('BUZZER OFF')
 	
 	parameterMeasureStart()
 		
 def configureScopeHorizontalAxis(CaptureTime_us):
+	global TIME_DIV
+	global TRIG_DELAY
 	#Supported Configurations for Siglent SDS1104
 	TimePerDivisionOptions_us  = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,100000]
 
@@ -83,24 +112,42 @@ def configureScopeHorizontalAxis(CaptureTime_us):
 
 	#Set Trigger Delay so T=0 is on left of screen
 	TriggerDelay_us = -TimePerDivision_us*7
-	
-	#Write configuration parameters to Oscilloscope
-	device.write(f'TIME_DIV {TimePerDivision_us}US')
-	device.write(f'TRIG_DELAY {TriggerDelay_us}US')
-	return TimePerDivision_us
+
+	#Write configuration parameters to Oscilloscope if changed
+	if(TimePerDivision_us != TIME_DIV):
+		device.write(f'TIME_DIV {TimePerDivision_us}US')
+		device.write(f'TRIG_DELAY {TriggerDelay_us}US')
+		TIME_DIV = TimePerDivision_us
+		TRIG_DELAY = TriggerDelay_us
 	
 def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
-	#Volts -> mV -> 4 sections -> 200% of data
-	VoltagePerDivision_mV = round(inputVoltage*1000/4*2)
-	device.write(f'C{VOLTAGE_CHANNEL}:VOLT_DIV {VoltagePerDivision_mV}MV')
+	global VOLT_DIV
+	global AMP_DIV
+	global MATH_DIV
 	
-	#Amps -> mA -> 4 sections -> Arms to Apkpk -> 150% of data
-	AmpsPerDivision_mA = round(targetCurrentRms*1000/4*1.4*1.5)
-	device.write(f'C{CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_mA}MV')	
+	#Volts -> mV -> 4 sections -> 200% of data
+	VoltsPerDivision_V = math.ceil(inputVoltage/4*2)
+	if(VoltsPerDivision_V != VOLT_DIV):
+		device.write(f'C{VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_V}V')
+		print(f'      Updated VOLT DIV Old:{VOLT_DIV}, New:{VoltsPerDivision_V}')
+		VOLT_DIV = VoltsPerDivision_V
+	
+	#Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
+	AmpsPerDivision_A = math.ceil(targetCurrentRms*10/4*1.4*1.5)/10
+	if(AmpsPerDivision_A != AMP_DIV):
+		device.write(f'C{CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_A*1000}mV')	
+		print(f'      Updated AMP DIV Old:{AMP_DIV}, New:{AmpsPerDivision_A}')
+		AMP_DIV = AmpsPerDivision_A
 	
 	#Power -> W -> 4 sections -> inputVoltage * targetCurrentRMS *  -> 150% of data
-	#AmpsPerDivision_mA = round(targetCurrentRms*1000/4*1.4*1.5)
-	#device.write(f'C{CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_mA}MV')	
+	MathDivOptions_W = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+	MathPerDivisionRaw = math.ceil(AmpsPerDivision_A * VoltsPerDivision_V * 2)
+	[x, MathPerDivision] = findFirstInstanceGreaterThan(MathDivOptions_W, MathPerDivisionRaw)
+
+	if(MathPerDivision != MATH_DIV):
+		device.write(f'MATH_VERT_DIV {MathPerDivision}V')	
+		print(f'      Updated MATH DIV Old:{MATH_DIV}, New: {MathPerDivision}')
+		MATH_DIV = MathPerDivision
 	
 def findFirstInstanceGreaterThan(array, value):
 	for x in range(len(array)):
@@ -114,48 +161,32 @@ def findClosestValue(array, value):
 	return [idx, array[idx]]
 
 def captureAllSingle(Samples,Time_Scale,V_Set,A_Set):
-	u_sec_set = configureScopeHorizontalAxis(Time_Scale)
-	configureScopeVerticalAxis(V_Set,A_Set)
-	TIME_DIV = u_sec_set/1000000
-	Channel_Split = 1
+	global VOLT_DIV
+	global VOLT_OFFSET
+
+	global AMP_DIV
+	global AMP_OFFSET
+
+	global MATH_DIV
+	global MATH_OFFSET
+
+	global TIME_DIV
+	global TRIG_DELAY
 	
-	if(u_sec_set == 5000):
+	start_time = time.perf_counter()
+	
+	configureScopeHorizontalAxis(Time_Scale)
+	
+	#configureScopeVerticalAxis(V_Set,A_Set)	
+	
+	Channel_Split = 1
+	if(TIME_DIV == 5000):
 		Sparsing = np.ceil(Time_Scale/(Samples/200))/Channel_Split
-	elif(u_sec_set == 2000):
+	elif(TIME_DIV == 2000):
 		Sparsing = np.ceil(Time_Scale/(Samples/500))/Channel_Split
 	else:
 		Sparsing = np.ceil(Time_Scale/(Samples/1000))/Channel_Split
-	
-	VOLT_DIV_RAW = device.query(str.format(f'C{VOLTAGE_CHANNEL}:VOLT_DIV?'))
-	#print(VOLT_DIV_RAW)
-	VOLT_DIV = float(VOLT_DIV_RAW[len(str.format(f'C{VOLTAGE_CHANNEL}:VDIV ')):-2])
-	#print(VOLT_DIV)
-	
-	VOLT_OFFSET = device.query(str.format(f'C{VOLTAGE_CHANNEL}:OFFSET?'))
-	VOLT_OFFSET = float(VOLT_OFFSET[len(str.format(f'C{VOLTAGE_CHANNEL}:OFST ')):-2])
-	
-	CURRENT_DIV = device.query(str.format(f'C{CURRENT_CHANNEL}:VOLT_DIV?'))
-	CURRENT_DIV = float(CURRENT_DIV[len(str.format(f'C{CURRENT_CHANNEL}:VDIV ')):-2])
-	
-	CURRENT_OFFSET = device.query(str.format(f'C{CURRENT_CHANNEL}:OFFSET?'))
-	CURRENT_OFFSET = float(CURRENT_OFFSET[len(str.format(f'C{CURRENT_CHANNEL}:OFST ')):-2])
-	
-	MATH_DIV = device.query(str.format('MATH_VERT_DIV?'))
-	MATH_DIV = parseOscilloscopeResponse(MATH_DIV)
-	
-	MATH_OFFSET = device.query(str.format('MATH_VERT_POS?'))
-	MATH_OFFSET = float(MATH_OFFSET[len(str.format('MTVP ')):-1])
-	
-	SAMPLE_RATE = device.query('SAMPLE_RATE?')
-	SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
-
-	TRIG_DELAY = device.query('TRIG_DELAY?')
-	TRIG_DELAY = -float(TRIG_DELAY[len('TRDL '):-2])
-
-	#get time interval, P143 in prog manual
-	TIME_VALUE = TRIG_DELAY - (TIME_DIV * 14/2)
-	TIME_INTERVAL = 1 / SAMPLE_RATE
-	
+		
 	# Setup waveform capture
 	device.write(str.format(f'WAVEFORM_SETUP SP,{Sparsing},NP,{Samples},FP,0'))
 
@@ -167,6 +198,7 @@ def captureAllSingle(Samples,Time_Scale,V_Set,A_Set):
 	################# Capture Data #################
 	VOLTAGE_WAVEFORM = []
 	CURRENT_WAVEFORM = []
+	MATH_WAVEFORM = []
 	i = 0
 	while ((len(VOLTAGE_WAVEFORM) != len(CURRENT_WAVEFORM)) | (len(VOLTAGE_WAVEFORM) == 0)):
 		[VOLTAGE_WAVEFORM, CURRENT_WAVEFORM, MATH_WAVEFORM] = collectOscilloscopeData()
@@ -182,17 +214,18 @@ def captureAllSingle(Samples,Time_Scale,V_Set,A_Set):
 			VOLTAGE_RESULT.append((item - 255) * (VOLT_DIV/25) - VOLT_OFFSET)
 		else:
 			VOLTAGE_RESULT.append(item * VOLT_DIV/25 - VOLT_OFFSET)
-				
+							
 	################# CURRENT PROCESS #################		
 	CURRENT_RESULT = []
 	#convert raw data to voltage, P142 in prog manual
 	for item in CURRENT_WAVEFORM:
 		if item > 127:
-			CURRENT_RESULT.append((item - 255) * (CURRENT_DIV/25) - CURRENT_OFFSET)
+			CURRENT_RESULT.append((item - 255) * (AMP_DIV/25) - AMP_OFFSET)
 		else:
-			CURRENT_RESULT.append(item * CURRENT_DIV/25 - CURRENT_OFFSET)
+			CURRENT_RESULT.append(item * AMP_DIV/25 - AMP_OFFSET)
 			
-	################# MATH PROCESS #################		
+			
+	################# MATH PROCESS #################
 	MATH_RESULT = []
 	#convert raw data to voltage, P142 in prog manual
 	for item in MATH_WAVEFORM:
@@ -200,27 +233,35 @@ def captureAllSingle(Samples,Time_Scale,V_Set,A_Set):
 			MATH_RESULT.append((item - 255) * (MATH_DIV/25) - MATH_OFFSET)
 		else:
 			MATH_RESULT.append(item * MATH_DIV/25 - MATH_OFFSET)
-			      
-	################# TIME PROCESS #################		
+			
+				      
+	################# TIME PROCESS #################	
+	SAMPLE_RATE = device.query('SAMPLE_RATE?')
+	SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
+	Time_Interval = 1 / SAMPLE_RATE
+
+	#get time interval, P143 in prog manual
+	Initial_Time_Value = TRIG_DELAY + (TIME_DIV * 14/2)
+		
 	#build time axis array
 	TIME_AXIS = []
 	for i in range(len(VOLTAGE_RESULT)):
 		if i ==0:
-			TIME_AXIS.append(TIME_VALUE)
+			TIME_AXIS.append(Initial_Time_Value)
 		elif i > 0:
-			TIME_AXIS.append(TIME_AXIS[0] + (TIME_INTERVAL * Sparsing)*i)
-	TIME_AXIS = np.array(TIME_AXIS)*1000
+			TIME_AXIS.append(TIME_AXIS[0] + (Time_Interval * Sparsing)*i)
+	TIME_AXIS = np.array(TIME_AXIS)
 	
 	#Combine data into one array
 	oscilloscope_raw_data = np.stack((TIME_AXIS, VOLTAGE_RESULT, CURRENT_RESULT, MATH_RESULT), axis=0)
 	
 	#Trim to length of one cycle
 	[idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)
-	[idx_end, val] = findClosestValue(oscilloscope_raw_data[0], (TIME_VALUE + Time_Scale/1000))
-	#print(val - Time_Scale/1000)
+	[idx_end, val] = findClosestValue(oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
 	oscilloscope_trim_data = oscilloscope_raw_data[:,idx_start:idx_end]
+	print(f'      OS Time: {time.perf_counter() - start_time:0.2f}')
+
 	parameterMeasureRead()
-	
 	return oscilloscope_trim_data
 	
 def collectOscilloscopeData():	
@@ -243,7 +284,6 @@ def parseOscilloscopeResponse(response):
 
 	if match:
 		processedResponse = float(match.group(1))
-		#print(match.group(1))
 	else:
 		processedResponse = None
 	return processedResponse
@@ -295,6 +335,6 @@ def parameterMeasureRead():
 	#Read Current
 	current_rms = parseOscilloscopeResponse(device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? RMS'))
 	current_pk = parseOscilloscopeResponse(device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? PKPK'))
-	return volt_rms, volt_pk, current_rms, current_pk
+	return round(volt_rms,1), round(volt_pk,1), round(current_rms,3), round(current_pk,3)
 	
 setupScope()
