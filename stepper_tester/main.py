@@ -15,7 +15,7 @@ import audio_capture
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC' #str(input('Model Number: ') or "17HS19-2004S1")
-test_id = '4.23.23wide'
+test_id = '4.23.23while'
 step_angle = 1.8
 
 speed_start = 25 #int(input('Start Speed: ') or 50)
@@ -100,8 +100,8 @@ def main(argv=None):
 				tmc_current = find_closest(tmc_array_5160, tmc_currentx10/10)
 				klipper_serial.current(tmc_current)
 				scope_capture.configureScopeVerticalAxis(voltage_setting, tmc_current)
-			
-				for speed in range(speed_start, speed_end+speed_step, speed_step):
+				speed = speed_start
+				while (speed <= speed_end):
 					
 					global TIME_MOVE
 					global testcounter
@@ -136,7 +136,6 @@ def main(argv=None):
 					#time.sleep(1)
 					#audio_capture.captureAudio(iterative_data)
 					#time.sleep(1)
-					
 				
 					#Start threads for measurement devices
 					with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -147,77 +146,82 @@ def main(argv=None):
 						#f5 = executor.submit(klipper_serial.readtemp)
 
 					#Process Load Cell Data
-					[grams, loadcell_time] = f3.result()
+					[grams, loadcell_time, lc_samples] = f3.result()
+					if grams < 0:
+						grams = 0
 					torque = grams / 1000 * 9.81 * 135 / 10
 					motor_power = torque / 100 * speed * 2 * 3.1415/40
-					mech_data_label = ('grams','torque', 'motor_power')
-					mech_data = (round(grams,3),round(torque,3), round(motor_power,3))
+					mech_data_label = ('grams','torque', 'motor_power', 'lc_samples')
+					mech_data = (round(grams,3),round(torque,3), round(motor_power,3), lc_samples)
 				
 					#Process Power Supply Data
-					[voltage_actual, power_actual, powersupply_time] = f2.result()
-					powersupply_data_label = ('v_supply', 'p_supply')
-					powersupply_data = (voltage_actual, power_actual)
+					[voltage_actual, power_actual, powersupply_time, samples] = f2.result()
+					powersupply_data_label = ('v_supply', 'p_supply', 'p_samples')
+					powersupply_data = (voltage_actual, power_actual, samples)
 				
 					#Process Oscilloscope Data
 					#[oscilloscope_raw_data, os_time] = f1.result()
-					[oscilloscope_raw_data, os_time, error_count] = scope_capture.captureAllSingle(SAMPLE_TARGET, Cycle_Length_us)
-				
-					current_max = np.percentile(oscilloscope_raw_data[2],95)
-					current_min = np.percentile(oscilloscope_raw_data[2],5)
-					current_pkpk = round((current_max - current_min)/2,2)
+					[oscilloscope_raw_data, os_time, error_count, error_delta] = scope_capture.captureAllSingle(SAMPLE_TARGET, Cycle_Length_us)
+					if ((error_count < 3) & (error_delta ==  0)):
+						current_max = np.percentile(oscilloscope_raw_data[2],95)
+						current_min = np.percentile(oscilloscope_raw_data[2],5)
+						current_pkpk = round((current_max - current_min)/2,2)
 					
-					current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
-					voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
+						current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
+						voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
 									
-					power_raw = np.multiply(oscilloscope_raw_data[1],oscilloscope_raw_data[2])
-					power_max = round(np.percentile(power_raw,90),2)
-					power_average = round(np.average(power_raw)*2,2)
+						power_raw = np.multiply(oscilloscope_raw_data[1],oscilloscope_raw_data[2])
+						power_max = round(np.percentile(power_raw,90),2)
+						power_average = round(np.average(power_raw)*2,2)
 
-					oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk', 'power_average', 'power_max', 'errors')
-					oscilloscope_data = (voltage_rms, current_rms, current_pkpk, power_average, power_max,error_count)
+						oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk', 'power_average', 'power_max', 'errors', 'error_delta')
+						oscilloscope_data = (voltage_rms, current_rms, current_pkpk, power_average, power_max,error_count, error_delta)
 
-					#Process Temperature
-					temperature_label = ('rpi_temp','driver_temp','stepper_temp')
-					temperature_data = klipper_serial.readtemp()
+						#Process Temperature
+						temperature_label = ('rpi_temp','driver_temp','stepper_temp')
+						temperature_data = klipper_serial.readtemp()
 				
-					#Process Cycle Data
-					cycle_time = (time.perf_counter() - start_time)
-					cycle_data_label = ('cycle_time','TIME_MOVE','samples')
-					cycle_data = (round(cycle_time, 2), TIME_MOVE,len(oscilloscope_raw_data[0]))
+						#Process Cycle Data
+						cycle_time = (time.perf_counter() - start_time)
+						cycle_data_label = ('cycle_time','TIME_MOVE','samples')
+						cycle_data = (round(cycle_time, 2), TIME_MOVE,len(oscilloscope_raw_data[0]))
 
-					#Combine Output Summary Data
-					output_data_label = iterative_data_label + powersupply_data_label + oscilloscope_data_label + mech_data_label+cycle_data_label + temperature_label 
-					output_data = iterative_data + powersupply_data + oscilloscope_data + mech_data + cycle_data + temperature_data
+						#Combine Output Summary Data
+						output_data_label = iterative_data_label + powersupply_data_label + oscilloscope_data_label + mech_data_label+cycle_data_label + temperature_label 
+						output_data = iterative_data + powersupply_data + oscilloscope_data + mech_data + cycle_data + temperature_data
 
-					#Write Header File Data to CSV File
-					if (testcounter == 1):
-						csv_logger.writeheader(model_number, test_id, output_data_label)
+						#Write Header File Data to CSV File
+						if (testcounter == 1):
+							csv_logger.writeheader(model_number, test_id, output_data_label)
 				
-					#Check if motor has stalled
-					if (grams < 5)and(speed>500):
-						failcount += 1
-						print('Failcount: %s, Grams: %0.1f, Speed: %d' % (failcount, grams, speed))
+						#Check if motor has stalled
+						if (grams < 5)and(speed>500):
+							failcount += 1
+							print('Failcount: %s, Grams: %0.1f, Speed: %d' % (failcount, grams, speed))
 				
-					if (failcount > 2):
-						#If motor has stalled twice, exit for loop
-						failcount = 0
-						break
-					else:
-						#Write to CSV File
-						csv_logger.writedata(model_number, test_id, output_data)
+						if (failcount > 2):
+							#If motor has stalled twice, exit for loop
+							failcount = 0
+							break
+						else:
+							#Write to CSV File
+							csv_logger.writedata(model_number, test_id, output_data)
 					
-						#Write Output Data to Terminal
-						terminal_display.display(testcounter, output_data_label, output_data)
+							#Write Output Data to Terminal
+							terminal_display.display(testcounter, output_data_label, output_data)
 						
-						if (failcount == 0):
- 							#Plot Oscilloscope Data if motor hasn't stalled
- 							plot_time = plotting.plotosData(output_data, output_data_label, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2], power_raw)
- 							#print(f'      Total: {cycle_time:0.2f}, PS: {powersupply_time:0.2f}, Load: {loadcell_time:0.2f}, OS: {os_time:0.2f}, PlotTime: {plot_time:0.2f}')
+							if (failcount == 0):
+								#Plot Oscilloscope Data if motor hasn't stalled
+								plot_time = plotting.plotosData(output_data, output_data_label, oscilloscope_raw_data[0],oscilloscope_raw_data[1],oscilloscope_raw_data[2], power_raw)
+								#print(f'      Total: {cycle_time:0.2f}, PS: {powersupply_time:0.2f}, Load: {loadcell_time:0.2f}, OS: {os_time:0.2f}, PlotTime: {plot_time:0.2f}')
 
-					###End Speed Iteration
-					testcounter += 1
+						###End Speed Iteration
+						speed += speed_step
+						testcounter += 1
+					else: 
+						cycle_time = (time.perf_counter() - start_time)
+						print(f'Reset Cycle: Error Count = {error_count}, Error Delta = {error_delta}')
 
-			
 				###End Current Iteration
 
 	#csvprocess.plotSummaryData(model_number)

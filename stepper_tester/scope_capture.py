@@ -111,7 +111,6 @@ def configureScopeHorizontalAxis(CaptureTime_us):
 
 	#Set Trigger Delay so T=0 is on left of screen
 	TriggerDelay_us = -TimePerDivision_us*7
-
 	#Write configuration parameters to Oscilloscope if changed
 	if(TimePerDivision_us != TIME_DIV):
 		device.write(f'TIME_DIV {TimePerDivision_us}US')
@@ -167,12 +166,13 @@ def captureAllSingle(Samples,Time_Scale):
 
 	SHARED_CHANNELS = 1
 	if(u_sec_set == 5000):
-		Sparsing = np.ceil(Time_Scale/(Samples/200))*SHARED_CHANNELS
+		#At 5000 samples, we have 17.5M samples per screen instead of just 14
+		Sparsing = np.ceil(Time_Scale*17.5/14/(Samples/200))*SHARED_CHANNELS
 	elif(u_sec_set == 2000):
 		Sparsing = np.ceil(Time_Scale/(Samples/500))*SHARED_CHANNELS
 	else:
 		Sparsing = np.ceil(Time_Scale/(Samples/1000))*SHARED_CHANNELS
-				
+						
 	# Setup waveform capture
 	device.write(str.format(f'WAVEFORM_SETUP SP,{Sparsing},NP,{Samples},FP,0'))
 	#Start Capture
@@ -233,9 +233,10 @@ def captureAllSingle(Samples,Time_Scale):
 	[idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)
 	[idx_end, val] = findClosestValue(oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
 	oscilloscope_trim_data = oscilloscope_raw_data[:,idx_start:idx_end]
+	delta = round(Time_Scale/1000 - oscilloscope_trim_data[0,-1],1)
 	os_time = time.perf_counter() - start_time
 
-	return [oscilloscope_trim_data, os_time,error_counts]
+	return [oscilloscope_trim_data, os_time,error_counts, delta]
 	
 def collectOscilloscopeData():	
 	#send capture to controller

@@ -16,7 +16,8 @@ def measure(sampleCount):
 	filtered_data = reject_range_outliers(np.array(measurements_power))
 	average_power = round(np.average(filtered_data),2)
 	powersupplytime = time.perf_counter() - start
-	return riden.get_v_out(), average_power, powersupplytime
+	samples = len(filtered_data)
+	return riden.get_v_out(), average_power, powersupplytime, samples
 
 def reject_range_outliers(data, range=0.2):
     d = np.abs(data - np.median(data))
