@@ -15,14 +15,14 @@ import audio_capture
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC' #str(input('Model Number: ') or "17HS19-2004S1")
-test_id = '4.23.23a'
+test_id = '4.23.23wide'
 step_angle = 1.8
 
-speed_start = 100 #int(input('Start Speed: ') or 50)
+speed_start = 25 #int(input('Start Speed: ') or 50)
 speed_end = 3000 #int(input('Ending Speed: ') or 300)
-speed_step = 100 #int(input('Speed Step: ') or 50)
+speed_step = 25 #int(input('Speed Step: ') or 50)
 
-tmc_start = 1.0#float(input('TMC Current Start: ') or 0.5)
+tmc_start = 0.6#float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.0 #float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.2 #float(input('TMC Current Step: ') or 0.1)
 tmc_array_5160 = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
@@ -136,32 +136,15 @@ def main(argv=None):
 					#time.sleep(1)
 					#audio_capture.captureAudio(iterative_data)
 					#time.sleep(1)
+					
 				
 					#Start threads for measurement devices
 					with concurrent.futures.ThreadPoolExecutor() as executor:
 						f3 = executor.submit(loadcell.measure,7) #3.2 sec, 2.4 thread time
 						f2 = executor.submit(powersupply.measure,10) #2.18 sec, 0.01 sec thread time
-						f1 = executor.submit(scope_capture.captureAllSingle,SAMPLE_TARGET,Cycle_Length_us)
+						#f1 = executor.submit(scope_capture.captureAllSingle,SAMPLE_TARGET,Cycle_Length_us)
 						#f4 = executor.submit(audio_capture.captureAudio,iterative_data)
 						#f5 = executor.submit(klipper_serial.readtemp)
-
-					#Process Oscilloscope Data
-					[oscilloscope_raw_data, os_time] = f1.result()
-										
-					#Process Oscilloscope Data
-					current_max = np.percentile(oscilloscope_raw_data[2],95)
-					current_min = np.percentile(oscilloscope_raw_data[2],5)
-					current_pkpk = round((current_max - current_min)/2,2)
-					
-					current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
-					voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
-									
-					power_raw = np.multiply(oscilloscope_raw_data[1],oscilloscope_raw_data[2])
-					power_max = round(np.percentile(power_raw,90),2)
-					power_average = round(np.average(power_raw)*2,2)
-
-					oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk', 'power_average', 'power_max')
-					oscilloscope_data = (voltage_rms, current_rms, current_pkpk, power_average, power_max)
 
 					#Process Load Cell Data
 					[grams, loadcell_time] = f3.result()
@@ -175,6 +158,24 @@ def main(argv=None):
 					powersupply_data_label = ('v_supply', 'p_supply')
 					powersupply_data = (voltage_actual, power_actual)
 				
+					#Process Oscilloscope Data
+					#[oscilloscope_raw_data, os_time] = f1.result()
+					[oscilloscope_raw_data, os_time, error_count] = scope_capture.captureAllSingle(SAMPLE_TARGET, Cycle_Length_us)
+				
+					current_max = np.percentile(oscilloscope_raw_data[2],95)
+					current_min = np.percentile(oscilloscope_raw_data[2],5)
+					current_pkpk = round((current_max - current_min)/2,2)
+					
+					current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)),3)
+					voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)),2)
+									
+					power_raw = np.multiply(oscilloscope_raw_data[1],oscilloscope_raw_data[2])
+					power_max = round(np.percentile(power_raw,90),2)
+					power_average = round(np.average(power_raw)*2,2)
+
+					oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk', 'power_average', 'power_max', 'errors')
+					oscilloscope_data = (voltage_rms, current_rms, current_pkpk, power_average, power_max,error_count)
+
 					#Process Temperature
 					temperature_label = ('rpi_temp','driver_temp','stepper_temp')
 					temperature_data = klipper_serial.readtemp()

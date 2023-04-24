@@ -61,11 +61,11 @@ def setupScope():
 	device.write('ACQUIRE_WAY SAMPLING')
 
 	#Set Trigger Mode
-	device.write('TRIG_MODE NORM')
+	device.write(f'TRIG_MODE NORM')
 	#Set Trigger Level to 0V
-	device.write('C{CURRENT_CHANNEL}:TRIG_LEVEL 100mV')
+	device.write(f'C{CURRENT_CHANNEL}:TRIG_LEVEL 100mV')
 	#Set Trigger Coupling to AC
-	device.write('C{CURRENT_CHANNEL}:TRIG_COUPLING DC')
+	device.write(f'C{CURRENT_CHANNEL}:TRIG_COUPLING DC')
 	#Set Trigger Select to EDGE and Current Channel
 	device.write(f'TRIG_SELECT EDGE, SR, C{CURRENT_CHANNEL}')
 	#Set Trigger Slope Positive
@@ -178,18 +178,18 @@ def captureAllSingle(Samples,Time_Scale):
 	#Start Capture
 	device.write('ARM')
 	device.write('WAIT')
-	time.sleep(0.1)
+	time.sleep(0.5)
 	
 	################# Capture Data #################
 	VOLTAGE_WAVEFORM = []
 	CURRENT_WAVEFORM = []
 	MATH_WAVEFORM = []
-	i = 0
+	error_counts = 0
 	while ((len(VOLTAGE_WAVEFORM) != len(CURRENT_WAVEFORM)) | (len(VOLTAGE_WAVEFORM) == 0)):
 		[VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
-		if(len(VOLTAGE_WAVEFORM) == 0 & i < 5):
+		if(len(VOLTAGE_WAVEFORM) == 0 & error_counts < 5):
 			print('Missed Data')
-			i += 1
+			error_counts += 1
 
 	################# VOLTAGE PROCESS #################
 	VOLTAGE_RESULT = []
@@ -235,7 +235,7 @@ def captureAllSingle(Samples,Time_Scale):
 	oscilloscope_trim_data = oscilloscope_raw_data[:,idx_start:idx_end]
 	os_time = time.perf_counter() - start_time
 
-	return oscilloscope_trim_data, os_time
+	return [oscilloscope_trim_data, os_time,error_counts]
 	
 def collectOscilloscopeData():	
 	#send capture to controller
