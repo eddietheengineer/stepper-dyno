@@ -187,9 +187,11 @@ def captureAllSingle(Samples,Time_Scale):
 	error_counts = 0
 	while ((len(VOLTAGE_WAVEFORM) != len(CURRENT_WAVEFORM)) | (len(VOLTAGE_WAVEFORM) == 0)):
 		[VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
-		if(len(VOLTAGE_WAVEFORM) == 0 & error_counts < 5):
+		if(len(VOLTAGE_WAVEFORM) == 0 & error_counts < 1):
 			print('Missed Data')
 			error_counts += 1
+		else:
+			break
 
 	################# VOLTAGE PROCESS #################
 	VOLTAGE_RESULT = []
@@ -242,7 +244,7 @@ def collectOscilloscopeData():
 	#send capture to controller
 	device.write(str.format(f'C{CURRENT_CHANNEL}:WAVEFORM? DAT2'))
 	device.write(str.format(f'C{VOLTAGE_CHANNEL}:WAVEFORM? DAT2'))
-	device.chunk_size = 1024*1024*1024
+	#device.chunk_size = 1024*1024*1024
 
 	# read capture from controller
 	VOLTAGE_WAVEFORM = device.query_binary_values(str.format(f'C{VOLTAGE_CHANNEL}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)

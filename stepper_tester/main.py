@@ -15,7 +15,7 @@ import audio_capture
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC' #str(input('Model Number: ') or "17HS19-2004S1")
-test_id = '4.23.23while'
+test_id = '4.25.23'
 step_angle = 1.8
 
 speed_start = 25 #int(input('Start Speed: ') or 50)
@@ -23,9 +23,10 @@ speed_end = 3000 #int(input('Ending Speed: ') or 300)
 speed_step = 25 #int(input('Speed Step: ') or 50)
 
 tmc_start = 0.6#float(input('TMC Current Start: ') or 0.5)
-tmc_end = 2.0 #float(input('TMC Current End: ') or 1.0)
+tmc_end = 2.4 #float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.2 #float(input('TMC Current Step: ') or 0.1)
-tmc_array_5160 = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
+#tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
+tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25, 1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 #microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
 microstep_array = [16]
@@ -34,8 +35,11 @@ voltage_start =12
 voltage_end = 48
 voltage_step = 12
 
+global reset_counter
+reset_counter = 1
+
 ACCELERATION = 10000
-SAMPLE_TARGET = 500000
+SAMPLE_TARGET = 100000
 
 global TIME_MOVE
 TIME_MOVE = 10
@@ -107,6 +111,7 @@ def main(argv=None):
 					global testcounter
 					global failcount
 					global cycle_time
+					global reset_counter
 				
 					#If previous move was longer than cycle time, delay until move is completed
 					if (cycle_time < TIME_MOVE)and(testcounter>1):
@@ -127,8 +132,8 @@ def main(argv=None):
 					klipper_serial.move(TIME_MOVE, speed, ACCELERATION)
 				
 					#Write Summary Array
-					iterative_data_label = ('model_number','test_id','test_counter','voltage_setting', 'microstep','tmc_current', 'speed')
-					iterative_data = (model_number, test_id, testcounter, voltage_setting, microstep_array[microstep_i], tmc_current, speed)
+					iterative_data_label = ('model_number','test_id','test_counter','voltage_setting', 'microstep','tmc_current', 'speed', 'reset_counter')
+					iterative_data = (model_number, test_id, testcounter, voltage_setting, microstep_array[microstep_i], tmc_current, speed, reset_counter)
 				
 					#Wait for Stepper to accelerate
 					time.sleep(speed/ACCELERATION+0.5)
@@ -162,7 +167,7 @@ def main(argv=None):
 					#Process Oscilloscope Data
 					#[oscilloscope_raw_data, os_time] = f1.result()
 					[oscilloscope_raw_data, os_time, error_count, error_delta] = scope_capture.captureAllSingle(SAMPLE_TARGET, Cycle_Length_us)
-					if ((error_count < 3) & (error_delta ==  0)):
+					if ((error_count == 0) & (error_delta ==  0)):
 						current_max = np.percentile(oscilloscope_raw_data[2],95)
 						current_min = np.percentile(oscilloscope_raw_data[2],5)
 						current_pkpk = round((current_max - current_min)/2,2)
@@ -218,9 +223,15 @@ def main(argv=None):
 						###End Speed Iteration
 						speed += speed_step
 						testcounter += 1
+
 					else: 
-						cycle_time = (time.perf_counter() - start_time)
 						print(f'Reset Cycle: Error Count = {error_count}, Error Delta = {error_delta}')
+						klipper_serial.restart()
+						time.sleep(10)
+						klipper_serial.current(tmc_current)
+						cycle_time = (time.perf_counter() - start_time)
+						reset_counter += 1
+
 
 				###End Current Iteration
 
