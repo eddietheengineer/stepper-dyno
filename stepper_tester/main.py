@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '4.26.23'
+test_id = '4.27.23'
 step_angle = 1.8
 
 speed_start = 25  # int(input('Start Speed: ') or 50)
@@ -23,7 +23,7 @@ speed_step = 25  # int(input('Speed Step: ') or 50)
 
 tmc_start = 0.6  # float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
-tmc_step = 0.6  # float(input('TMC Current Step: ') or 0.1)
+tmc_step = 0.2  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
                   1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
@@ -254,10 +254,10 @@ def main():
                         cycle_time = (time.perf_counter() - start_time)
                         reset_counter += 1
 
-                # End Current Iteration
+             # End Current Iteration
 
-        # csvprocess.plotSummaryData(model_number)
-        shutdown_dyno()
+    # csvprocess.plotSummaryData(model_number)
+    shutdown_dyno()
 
 
 def initialize_dyno(voltage):
