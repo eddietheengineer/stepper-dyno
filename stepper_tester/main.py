@@ -264,7 +264,7 @@ def initialize_dyno(voltage):
     powersupply.initialize(voltage)
     klipper_serial.restart()
     time.sleep(1)
-    loadcell.tare
+    loadcell.tare()
     scope_capture.setupScope()
 
 def shutdown_dyno():
