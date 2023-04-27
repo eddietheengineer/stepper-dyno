@@ -65,7 +65,7 @@ def setupScope():
     device.write('ACQUIRE_WAY SAMPLING')
 
     # Set Trigger Mode
-    device.write(f'TRIG_MODE NORM')
+    device.write(f'TRIG_MODE SINGLE')
     # Set Trigger Level to 0V
     device.write(f'C{CURRENT_CHANNEL}:TRIG_LEVEL 100mV')
     # Set Trigger Coupling to AC
@@ -187,7 +187,7 @@ def captureAllSingle(Samples, Time_Scale):
     # Start Capture
     device.write('ARM')
     device.write('WAIT')
-    time.sleep(0.5)
+    time.sleep(1)
 
     ################# Capture Data #################
     VOLTAGE_WAVEFORM = []
