@@ -33,6 +33,7 @@ def updateMS(microstep): # looping through the file
 	
 	# close the file
 	write_file.close()
+	print(f'      Microsteps: {microstep}')
 	
 def identifyLine(ID):
 	file = open("/home/pi/printer_data/config/printer.cfg", "r")

@@ -1,19 +1,21 @@
 import matplotlib.pyplot as plotter
-import os		
+import os
+import time
 
-def plotosData(output_data, TIME_AXIS, RESULT1, RESULT2):
-	Model_Number = output_data[0]
-	Test_ID = output_data[1]
-	Test_Number = output_data[2]
-	Voltage = output_data[3]
-	Microstep = output_data[4]
-	Current = output_data[5]
-	Speed = output_data[6]
+def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
+	start_time = time.perf_counter()
+	Model_Number = output_data[index_data.index('model_number')]
+	Test_ID = output_data[index_data.index('test_id')]
+	Test_Number = output_data[index_data.index('test_counter')]
+	Voltage = output_data[index_data.index('voltage_setting')]
+	Microstep = output_data[index_data.index('microstep')]
+	Current = output_data[index_data.index('tmc_current')]
+	Speed = output_data[index_data.index('speed')]
 	
-	Power = output_data[10]
-	Current_RMS = output_data[11]
-	Current_PkPk = output_data[12]
-	Torque = output_data[15]
+	Power = output_data[index_data.index('p_supply')]
+	Current_RMS = output_data[index_data.index('current_rms')]
+	Current_PkPk = output_data[index_data.index('current_pkpk')]
+	Torque = output_data[index_data.index('torque')]
 
 	Top_Line = str('Model: %s Test ID: %s Test Number: %d' % (Model_Number, Test_ID, Test_Number))
 	Middle_Line = str('Voltage: %d V, Microstep: %d, Current: %0.2f A, Speed: %d mm/s' % (Voltage, Microstep, Current, Speed))
@@ -22,18 +24,23 @@ def plotosData(output_data, TIME_AXIS, RESULT1, RESULT2):
 	plotter.rcParams['figure.figsize'] = [8,4.5]
 	fig, ax1 = plotter.subplots()
 	ax2 = ax1.twinx()
+	ax3 = ax1.twinx()
 	ax1.plot(TIME_AXIS, RESULT1, linewidth = 0.5, label = "Voltage")
 	ax2.plot(TIME_AXIS, RESULT2, linewidth = 0.5, label = "Current", color = "orange")
+	ax3.plot(TIME_AXIS, RESULT3, linewidth = 0.5, label = "Power", color = "red")
 	plotter.title('%s \n %s' % (Top_Line, Middle_Line))
 	ax1.set_xlabel("Time (ms)")
 	ax1.set_ylabel("Volts")
-	ax1.set_ylim([-60,60])
+	ax1.set_ylim([-80,80])
 	ax2.set_ylabel("Amps")
-	ax2.set_ylim([-3,3])
+	ax2.set_ylim([-4,4])
+	ax3.set_ylabel("Power")
+	ax3.set_ylim([-160,160])
 
 	lines, labels = ax1.get_legend_handles_labels()
 	lines2, labels2 = ax2.get_legend_handles_labels()
-	ax1.legend(lines + lines2, labels + labels2, loc=0)
+	lines3, labels3 = ax3.get_legend_handles_labels()
+	ax1.legend(lines + lines2 + lines3, labels + labels2 + labels3, loc=0)
 	
 	plotter.margins(0)
 	plotter.grid('True')
@@ -46,6 +53,8 @@ def plotosData(output_data, TIME_AXIS, RESULT1, RESULT2):
 	plotter.savefig('/home/pi/Desktop/%s.png' % filename, dpi=240)
 	plotter.clf()
 	plotter.close()
+	plot_time = time.perf_counter() - start_time
+	return plot_time
 	
 def plotSummaryData(output_data):
 	Model_Number = output_data[0]
