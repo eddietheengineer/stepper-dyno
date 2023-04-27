@@ -5,6 +5,7 @@ import string
 def restart():
 	ser = serial.Serial("/home/pi/printer_data/comms/klippy.serial", baudrate=250000)
 	ser.write(str.encode("FIRMWARE_RESTART\n"))
+	print('      Klipper Restarted')
 	ser.close()
 	
 def current(amps):

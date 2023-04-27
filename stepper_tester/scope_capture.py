@@ -29,7 +29,9 @@ try:
     rm = visa.ResourceManager()
     # Connect to device (Make sure to change the resource locator!)
     #device = rm.open_resource('USB0::62700::60984::SDSMMGKC6R0277::0::INSTR',query_delay=0.25)
-    device = rm.open_resource('TCPIP::10.10.10.163::INSTR',query_delay=0.25)
+    #device = rm.open_resource('TCPIP::10.10.10.163::INSTR',query_delay=0.25)
+    device = rm.open_resource('TCPIP::192.168.1.128::INSTR',query_delay=0.25)
+
 
 except:
     print('      Failed to connect to oscilloscope')
@@ -185,60 +187,62 @@ def captureAllSingle(Samples,Time_Scale):
 	CURRENT_WAVEFORM = []
 	MATH_WAVEFORM = []
 	error_counts = 0
-	while ((len(VOLTAGE_WAVEFORM) != len(CURRENT_WAVEFORM)) | (len(VOLTAGE_WAVEFORM) == 0)):
+	orig_length = 0
+	while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts == 0)):
 		[VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
-		if(len(VOLTAGE_WAVEFORM) == 0 & error_counts < 1):
-			print('Missed Data')
+		if(len(VOLTAGE_WAVEFORM) == 0):
+			print(f'Missed Data: Error - {error_counts}, Length - {len(VOLTAGE_WAVEFORM)}')
 			error_counts += 1
-		else:
-			break
 
-	################# VOLTAGE PROCESS #################
-	VOLTAGE_RESULT = []
-	#convert raw data to voltage, P142 in prog manual
-	for item in VOLTAGE_WAVEFORM:
-		if item > 127:
-			VOLTAGE_RESULT.append((item - 255) * (VOLT_DIV/25) - VOLT_OFFSET)
-		else:
-			VOLTAGE_RESULT.append(item * VOLT_DIV/25 - VOLT_OFFSET)
+	if(len(VOLTAGE_WAVEFORM) != 0):
+		################# VOLTAGE PROCESS #################
+		VOLTAGE_RESULT = []
+		#convert raw data to voltage, P142 in prog manual
+		for item in VOLTAGE_WAVEFORM:
+			if item > 127:
+				VOLTAGE_RESULT.append((item - 255) * (VOLT_DIV/25) - VOLT_OFFSET)
+			else:
+				VOLTAGE_RESULT.append(item * VOLT_DIV/25 - VOLT_OFFSET)
+		orig_length = len(VOLTAGE_RESULT)
 							
-	################# CURRENT PROCESS #################		
-	CURRENT_RESULT = []
-	#convert raw data to voltage, P142 in prog manual
-	for item in CURRENT_WAVEFORM:
-		if item > 127:
-			CURRENT_RESULT.append((item - 255) * (AMP_DIV/25) - AMP_OFFSET)
-		else:
-			CURRENT_RESULT.append(item * AMP_DIV/25 - AMP_OFFSET)
+		################# CURRENT PROCESS #################		
+		CURRENT_RESULT = []
+		#convert raw data to voltage, P142 in prog manual
+		for item in CURRENT_WAVEFORM:
+			if item > 127:
+				CURRENT_RESULT.append((item - 255) * (AMP_DIV/25) - AMP_OFFSET)
+			else:
+				CURRENT_RESULT.append(item * AMP_DIV/25 - AMP_OFFSET)
 			
-	################# TIME PROCESS #################	
-	SAMPLE_RATE = device.query('SAMPLE_RATE?')
-	SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
-	Time_Interval_ms = 1 / SAMPLE_RATE * 1000
+		################# TIME PROCESS #################	
+		SAMPLE_RATE = device.query('SAMPLE_RATE?')
+		SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
+		Time_Interval_ms = 1 / SAMPLE_RATE * 1000
 
-	#get time interval, P143 in prog manual
-	Initial_Time_Value = TRIG_DELAY + (TIME_DIV * 14/2)
+		#get time interval, P143 in prog manual
+		Initial_Time_Value = TRIG_DELAY + (TIME_DIV * 14/2)
 		
-	#build time axis array
-	TIME_AXIS = []
-	for i in range(len(VOLTAGE_RESULT)):
-		if i ==0:
-			TIME_AXIS.append(Initial_Time_Value)
-		elif i > 0:
-			TIME_AXIS.append(TIME_AXIS[0] + (Time_Interval_ms * Sparsing)*i)
-	TIME_AXIS = np.array(TIME_AXIS)
+		#build time axis array
+		TIME_AXIS = []
+		for i in range(len(VOLTAGE_RESULT)):
+			if i ==0:
+				TIME_AXIS.append(Initial_Time_Value)
+			elif i > 0:
+				TIME_AXIS.append(TIME_AXIS[0] + (Time_Interval_ms * Sparsing)*i)
+		TIME_AXIS = np.array(TIME_AXIS)
 	
-	#Combine data into one array
-	oscilloscope_raw_data = np.stack((TIME_AXIS, VOLTAGE_RESULT, CURRENT_RESULT), axis=0)
+		#Combine data into one array
+		oscilloscope_raw_data = np.stack((TIME_AXIS, VOLTAGE_RESULT, CURRENT_RESULT), axis=0)
 	
-	#Trim to length of one cycle
-	[idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)
-	[idx_end, val] = findClosestValue(oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
-	oscilloscope_trim_data = oscilloscope_raw_data[:,idx_start:idx_end]
-	delta = round(Time_Scale/1000 - oscilloscope_trim_data[0,-1],1)
-	os_time = time.perf_counter() - start_time
-
-	return [oscilloscope_trim_data, os_time,error_counts, delta]
+		#Trim to length of one cycle
+		[idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)
+		[idx_end, val] = findClosestValue(oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
+		oscilloscope_trim_data = oscilloscope_raw_data[:,idx_start:idx_end]
+		delta = round(Time_Scale/1000 - oscilloscope_trim_data[0,-1],1)
+		os_time = time.perf_counter() - start_time
+		return [oscilloscope_trim_data, os_time,error_counts, delta, orig_length, Sparsing]
+	else:
+		return [0, 0, error_counts, 1, orig_length, Sparsing]
 	
 def collectOscilloscopeData():	
 	#send capture to controller
