@@ -14,12 +14,12 @@ from dataclasses import dataclass
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '4.27.23a'
+test_id = '4.28.23'
 step_angle = 1.8
 
-speed_start = 25  # int(input('Start Speed: ') or 50)
+speed_start = 10  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 25  # int(input('Speed Step: ') or 50)
+speed_step = 10  # int(input('Speed Step: ') or 50)
 
 tmc_start = 0.6  # float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
@@ -29,7 +29,7 @@ tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.
                   1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
-microstep_array = [16]
+microstep_array = [16,32]
 
 voltage_start = 12
 voltage_end = 48
