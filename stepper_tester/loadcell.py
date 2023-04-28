@@ -27,7 +27,7 @@ def tare():
 def measure(sampleCount):
     start = time.perf_counter()
     measurements = []
-    for x in range(sampleCount):
+    for _ in range(sampleCount):
         val = hx.get_weight(5)
         measurements.append(val)
         time.sleep(0.1)

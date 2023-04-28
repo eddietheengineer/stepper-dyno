@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '4.27.23'
+test_id = '4.27.23a'
 step_angle = 1.8
 
 speed_start = 25  # int(input('Start Speed: ') or 50)

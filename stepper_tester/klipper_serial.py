@@ -1,6 +1,7 @@
 import serial
 import io
 import string
+import re
 
 
 def restart():
@@ -38,12 +39,13 @@ def readtemp():
     ser.write(str.encode("M105\n"))
     sio.flush()
     temps_raw = sio.readline()
-    temps_raw = temps_raw.split()
-    temps = []
-    for x in range(len(temps_raw)):
-        for i in range(len(string.ascii_uppercase)):
-            if (temps_raw[x][0] == string.ascii_uppercase[i]):
-                temps.append(float(temps_raw[x][2:]))
+    temps_split = temps_raw.split()
+    
+    #All measured temps have a uppercase A-Z character in the first position
+    temps = [re.findall("\d+\.\d+", value)[0]
+             for value in temps_split if value[0] in string.ascii_uppercase]
     ser.close()
-    temps = tuple(temps)
-    return temps
+    return tuple(temps)
+
+
+readtemp()

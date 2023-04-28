@@ -12,7 +12,7 @@ def scan():
 def measure(sampleCount):
     start = time.perf_counter()
     measurements_power = []
-    for x in range(sampleCount):
+    for _ in range(sampleCount):
         val = riden.get_p_out()
         measurements_power.append(val)
         time.sleep(0.1)
@@ -30,7 +30,7 @@ def reject_range_outliers(data, allowedrange=0.2):
 
 def voltage_setting(voltage):
     riden.set_v_set(voltage)
-    print(f'      Updated Supply Voltage: {voltage}V')
+    print(f'Power Supply Voltage: {voltage}V')
     riden.set_output(1)
 
 
@@ -38,9 +38,9 @@ def initialize(voltage):
     riden.set_v_set(voltage)
     riden.set_i_set(6)
     riden.set_output(1)
-    print("      Power Supply Initialized")
+    print("Power Supply On")
 
 
 def close():
     riden.set_output(0)
-    print("      Power Suppply Off")
+    print("Power Supply Off")
