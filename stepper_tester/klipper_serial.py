@@ -40,12 +40,9 @@ def readtemp():
     sio.flush()
     temps_raw = sio.readline()
     temps_split = temps_raw.split()
-    
-    #All measured temps have a uppercase A-Z character in the first position
+
+    # All measured temps have a uppercase A-Z character in the first position
     temps = [re.findall("\d+\.\d+", value)[0]
              for value in temps_split if value[0] in string.ascii_uppercase]
     ser.close()
     return tuple(temps)
-
-
-readtemp()

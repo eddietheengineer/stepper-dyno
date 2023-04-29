@@ -240,9 +240,11 @@ def captureAllSingle(Samples, Time_Scale):
                     TIME_AXIS[0] + (Time_Interval_ms * Sparsing)*i)
         TIME_AXIS = np.array(TIME_AXIS)
 
+        power_raw = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
+
         # Combine data into one array
         oscilloscope_raw_data = np.stack(
-            (TIME_AXIS, VOLTAGE_RESULT, CURRENT_RESULT), axis=0)
+            (TIME_AXIS, VOLTAGE_RESULT, CURRENT_RESULT, power_raw), axis=0)
 
         # Trim to length of one cycle
         [idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)

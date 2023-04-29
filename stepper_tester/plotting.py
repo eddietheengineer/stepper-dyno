@@ -50,8 +50,7 @@ def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
     plotter.margins(0)
     plotter.grid('True')
 
-    filepath = '/home/pi/Desktop/%s_%s/Oscilloscope_Plots/' % (
-        Model_Number, Test_ID)
+    filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Plots/'
     if not os.path.exists(filepath):
         os.makedirs(filepath)
 
