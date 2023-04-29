@@ -38,9 +38,9 @@ def writeoscilloscopedata(output_data, index_data, oscilloscope_data):
     if not os.path.exists(filepath):
         os.makedirs(filepath)
 
-    csvfilepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Data/{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}V_{Microstep}ms_{Current}A_{Speed}mms.zip'
+    csvfilepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Data/{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}V_{Microstep}ms_{Current}A_{Speed}mms.gzip'
     oscilloscope_data_transposed = np.transpose(oscilloscope_data)
 
     DF = pd.DataFrame(oscilloscope_data_transposed, columns=['Time (ms)', 'Voltage (V)', 'Current (A)', 'Power (W)'])
     DF.round({'Time (ms)':8, 'Voltage (V)':4, 'Current (A)':4, 'Power (W)':4})
-    DF.to_csv(csvfilepath, compression="zip")
+    DF.to_csv(csvfilepath, compression="gzip")

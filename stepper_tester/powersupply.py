@@ -23,6 +23,13 @@ def measure(sampleCount):
     return riden.get_v_out(), average_power, powersupplytime, samples
 
 
+def summary(samples):
+    [voltage_actual, power_actual, _, samples] = measure(samples)
+    powersupply_data_label = ('v_supply', 'p_supply', 'p_samples')
+    powersupply_data = (voltage_actual, power_actual, samples)
+    return powersupply_data_label, powersupply_data
+
+
 def reject_range_outliers(data, allowedrange=0.2):
     d = np.abs(data - np.median(data))
     return data[d < allowedrange]
