@@ -10,8 +10,6 @@ samplecount = 5
 hx = HX711(5, 6)
 hx.set_reading_format("MSB", "MSB")
 hx.set_reference_unit(referenceunit)
-hx.reset()
-
 
 def close():
     print("      Cleaning Loadcell")

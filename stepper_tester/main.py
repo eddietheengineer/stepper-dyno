@@ -2,11 +2,9 @@ import klipper_serial
 import loadcell
 import powersupply
 import scope_capture
-import numpy as np
 import time
 import terminal_display
 import concurrent.futures
-import plotting
 import csv_logger
 import sys
 import change_config
@@ -17,23 +15,23 @@ model_number = 'LDO_42STH48-2504AC'
 test_id = '4.28.23c'
 step_angle = 1.8
 
-speed_start = 10  # int(input('Start Speed: ') or 50)
-speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 10  # int(input('Speed Step: ') or 50)
+speed_start = 100  # int(input('Start Speed: ') or 50)
+speed_end = 500  # int(input('Ending Speed: ') or 300)
+speed_step = 400  # int(input('Speed Step: ') or 50)
 
-tmc_start = 0.6  # float(input('TMC Current Start: ') or 0.5)
-tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
-tmc_step = 0.2  # float(input('TMC Current Step: ') or 0.1)
+tmc_start = 0.8  # float(input('TMC Current Start: ') or 0.5)
+tmc_end = 1.6  # float(input('TMC Current End: ') or 1.0)
+tmc_step = 0.8  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
                   1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
-microstep_array = [16, 32]
+microstep_array = [16, 128]
 
 voltage_start = 12
 voltage_end = 48
-voltage_step = 12
+voltage_step = 36
 
 reset_counter = 1
 
@@ -41,7 +39,6 @@ ACCELERATION = 10000
 SAMPLE_TARGET = 500000
 
 TIME_MOVE = 10
-initial_time = time.time()
 testcounter = 1
 failcount = 0
 cycle_time = 0
@@ -160,37 +157,43 @@ def main():
                         'rpi_temp', 'driver_temp', 'stepper_temp')
                     temperature_data = klipper_serial.readtemp()
 
-                    # Process Cycle Data
-                    cycle_time = (time.perf_counter() - start_time)
-                    cycle_data_label = ('cycle_time', 'TIME_MOVE')
-                    cycle_data = (round(cycle_time, 2), TIME_MOVE)
-
-                    # Combine Output Summary Data
-                    output_data_label = iterative_data_label + powersupply_data_label + \
-                        oscilloscope_data_label + oscilloscope_reference_label + \
-                        mech_data_label+cycle_data_label + temperature_label
-                    output_data = iterative_data + powersupply_data + \
-                        oscilloscope_data + oscilloscope_reference_data + \
-                        mech_data + cycle_data + temperature_data
-
-                    # Write Header File Data to CSV File
-                    if (testcounter == 1):
-                        csv_logger.writeheader(
-                            model_number, test_id, output_data_label)
-
                     # Check if oscilloscope actually captured data
-                    if ((oscilloscope_reference_data[4] == 0) & (round(oscilloscope_reference_data[3],1) == 0)):
+                    if ((oscilloscope_reference_data[4] == 0) & (round(oscilloscope_reference_data[3], 1) == 0)):
 
                         # Check if motor has stalled
                         if (mech_data[0] < 5) and (speed > 500):
                             failcount += 1
                             print(
-                                f'Failcount: {failcount}, Grams: {grams:0.1f}, Speed: {speed}')
+                                f'Failcount: {failcount}, Speed: {speed}')
 
                         if (failcount > 2):
                             # If motor has stalled twice, exit for loop
                             failcount = 0
                             break
+
+                        # if (failcount == 0):
+                        #     # Plot Oscilloscope Data if motor hasn't stalled
+                        #     plotting.plotosData(
+                        #         output_data, output_data_label, oscilloscope_raw_data[0], oscilloscope_raw_data[1], oscilloscope_raw_data[2], oscilloscope_raw_data[3])
+                        #     # csv_logger.writeoscilloscopedata(output_data, output_data_label, oscilloscope_raw_data)
+
+                        # Process Cycle Data
+                        cycle_time = (time.perf_counter() - start_time)
+                        cycle_data_label = ('cycle_time', 'TIME_MOVE')
+                        cycle_data = (round(cycle_time, 2), TIME_MOVE)
+
+                        # Combine Output Summary Data
+                        output_data_label = iterative_data_label + powersupply_data_label + \
+                            oscilloscope_data_label + oscilloscope_reference_label + \
+                            mech_data_label+cycle_data_label + temperature_label
+                        output_data = iterative_data + powersupply_data + \
+                            oscilloscope_data + oscilloscope_reference_data + \
+                            mech_data + cycle_data + temperature_data
+
+                        # Write Header File Data to CSV File
+                        if (testcounter == 1):
+                            csv_logger.writeheader(
+                                model_number, test_id, output_data_label)
 
                         # Write to CSV File
                         csv_logger.writedata(
@@ -199,12 +202,6 @@ def main():
                         # Write Output Data to Terminal
                         terminal_display.display(
                             testcounter, output_data_label, output_data)
-
-                        if (failcount == 0):
-                            # Plot Oscilloscope Data if motor hasn't stalled
-                            plotting.plotosData(
-                                output_data, output_data_label, oscilloscope_raw_data[0], oscilloscope_raw_data[1], oscilloscope_raw_data[2], oscilloscope_raw_data[3])
-                            # csv_logger.writeoscilloscopedata(output_data, output_data_label, oscilloscope_raw_data)
 
                         # End Speed Iteration
                         speed += speed_step

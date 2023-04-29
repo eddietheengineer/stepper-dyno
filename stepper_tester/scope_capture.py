@@ -25,10 +25,10 @@ try:
     # device = rm.open_resource('TCPIP::10.10.10.163::INSTR',query_delay=0.25)
     device = rm.open_resource('TCPIP::192.168.1.128::INSTR', query_delay=0.25)
 
-except:
+except Exception:
     print('      Failed to connect to oscilloscope')
     sys.exit(0)
-device.timeout = 30000
+device.timeout = 5000
 
 
 def startChannels():
@@ -69,7 +69,7 @@ def setupScope():
     device.write(f'C{CURRENT_CHANNEL}:TRIG_SLOPE POS')
 
     # set memory depth to 14M Samples
-    #device.write('MEMORY_SIZE 14M')
+    # device.write('MEMORY_SIZE 14M')
     # Turn Off Persistent Display
     device.write('PERSIST OFF')
 
@@ -150,17 +150,20 @@ def findClosestValue(array, value):
     idx = (np.abs(array-value)).argmin()
     return [idx, array[idx]]
 
+
 def setSparsing(Samples, Time_Scale):
     if (TIME_DIV == 10000):
         Sparsing = int(np.ceil(Time_Scale/(Samples/100))*SHARED_CHANNELS)
     elif (TIME_DIV == 5000):
         # At 5ms/div, we have 17.5M samples per screen instead of just 14
-        Sparsing = int(np.ceil(Time_Scale*17.5/14/(Samples/200))*SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale*17.5/14 /
+                       (Samples/200))*SHARED_CHANNELS)
     elif (TIME_DIV == 2000):
         Sparsing = int(np.ceil(Time_Scale/(Samples/500))*SHARED_CHANNELS)
     else:
         Sparsing = int(np.ceil(Time_Scale/(Samples/1000))*SHARED_CHANNELS)
     return Sparsing
+
 
 def captureAllSingle(Samples, Time_Scale):
 
@@ -180,6 +183,7 @@ def captureAllSingle(Samples, Time_Scale):
     CURRENT_WAVEFORM = []
     error_counts = 0
     orig_length = 0
+    oscilloscope_trim_data = []
     while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts == 0)):
         [VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
         if (len(VOLTAGE_WAVEFORM) == 0):
@@ -237,37 +241,49 @@ def captureAllSingle(Samples, Time_Scale):
         [idx_end, _] = findClosestValue(
             oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
         oscilloscope_trim_data = oscilloscope_raw_data[:, idx_start:idx_end]
-        return [oscilloscope_trim_data, error_counts, orig_length, Sparsing]
-    else:
-        return [0, error_counts, orig_length, Sparsing]
+    return [oscilloscope_trim_data, error_counts, orig_length, Sparsing]
 
 
 def summary(Samples, Time_Scale):
+    Sparsing = 0
+    originalsamples = 0
+    error_delta = 0
+    trim_samples = 0
+    voltage_rms = 0
+    current_rms = 0
+    current_pkpk = 0
+    power_average = 0
+    power_max = 0
+
     [oscilloscope_raw_data, error_count, originalsamples,
         Sparsing] = captureAllSingle(Samples, Time_Scale)
-    
-    current_max = np.percentile(oscilloscope_raw_data[2], 95)
-    current_min = np.percentile(oscilloscope_raw_data[2], 5)
-    current_pkpk = round((current_max - current_min)/2, 2)
-    current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)), 3)
 
-    voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)), 2)
+    if (error_count == 0 & len(oscilloscope_raw_data) > 0):
+        current_max = np.percentile(oscilloscope_raw_data[2], 95)
+        current_min = np.percentile(oscilloscope_raw_data[2], 5)
+        current_pkpk = round((current_max - current_min)/2, 2)
+        current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)), 3)
 
-    power_raw = np.multiply(oscilloscope_raw_data[1], oscilloscope_raw_data[2])
-    power_max = round(np.percentile(power_raw, 90), 2)
-    power_average = round(np.average(power_raw)*2, 2)
+        voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)), 2)
+
+        power_raw = np.multiply(
+            oscilloscope_raw_data[1], oscilloscope_raw_data[2])
+        power_max = round(np.percentile(power_raw, 90), 2)
+        power_average = round(np.average(power_raw)*2, 2)
+
+        trim_samples = len(oscilloscope_raw_data[0])
+
+        error_delta = round(Time_Scale/1000 - oscilloscope_raw_data[0, -1], 3)
 
     oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk',
                                'power_average', 'power_max')
     oscilloscope_data = (voltage_rms, current_rms, current_pkpk,
                          power_average, power_max)
 
-    error_delta = round(Time_Scale/1000 - oscilloscope_raw_data[0, -1], 3)
-
     oscilloscope_reference_label = (
         'sparsing', 'orig_samples', 'trim_samples', 'error_delta', 'errors')
-    oscilloscope_reference_data = (Sparsing, originalsamples, len(
-        oscilloscope_raw_data[0]), error_delta, error_count)
+    oscilloscope_reference_data = (
+        Sparsing, originalsamples, trim_samples, error_delta, error_count)
 
     return oscilloscope_raw_data, oscilloscope_data_label, oscilloscope_data, oscilloscope_reference_label, oscilloscope_reference_data
 
