@@ -174,6 +174,7 @@ def captureAllSingle(Samples, Time_Scale):
     # Setup waveform capture
     device.write(str.format(f'WAVEFORM_SETUP SP,{Sparsing},NP,{Samples},FP,0'))
     # Start Capture
+    time.sleep(1)
     device.write('ARM')
     device.write('WAIT')
     time.sleep(1)
@@ -240,7 +241,9 @@ def captureAllSingle(Samples, Time_Scale):
         [idx_start, _] = findClosestValue(oscilloscope_raw_data[0], 0)
         [idx_end, _] = findClosestValue(
             oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
+
         oscilloscope_trim_data = oscilloscope_raw_data[:, idx_start:idx_end]
+        
     return [oscilloscope_trim_data, error_counts, orig_length, Sparsing]
 
 
@@ -248,21 +251,24 @@ def summary(Samples, Time_Scale):
     Sparsing = 0
     originalsamples = 0
     error_delta = 0
+    error_count = 0
     trim_samples = 0
     voltage_rms = 0
     current_rms = 0
+    current_average = 0
     current_pkpk = 0
     power_average = 0
     power_max = 0
 
     [oscilloscope_raw_data, error_count, originalsamples,
         Sparsing] = captureAllSingle(Samples, Time_Scale)
-
-    if (error_count == 0 & len(oscilloscope_raw_data) > 0):
+    
+    if (error_count == 0):
         current_max = np.percentile(oscilloscope_raw_data[2], 95)
         current_min = np.percentile(oscilloscope_raw_data[2], 5)
         current_pkpk = round((current_max - current_min)/2, 2)
         current_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[2]**2)), 3)
+        current_average = round(np.average(np.absolute(oscilloscope_raw_data[2])),3)
 
         voltage_rms = round(np.sqrt(np.mean(oscilloscope_raw_data[1]**2)), 2)
 
@@ -274,10 +280,14 @@ def summary(Samples, Time_Scale):
         trim_samples = len(oscilloscope_raw_data[0])
 
         error_delta = round(Time_Scale/1000 - oscilloscope_raw_data[0, -1], 3)
+    else:
+        error_count += 1
 
-    oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk',
+    oscilloscope_data_dict = {'voltage_rms':voltage_rms, 'current_rms':current_rms, 'current_pkpk':current_pkpk}
+    print(oscilloscope_data_dict['voltage_rms'])
+    oscilloscope_data_label = ('voltage_rms', 'current_rms', 'current_pkpk', 'current_average',
                                'power_average', 'power_max')
-    oscilloscope_data = (voltage_rms, current_rms, current_pkpk,
+    oscilloscope_data = (voltage_rms, current_rms, current_pkpk, current_average,
                          power_average, power_max)
 
     oscilloscope_reference_label = (
@@ -299,6 +309,7 @@ def collectOscilloscopeData():
         f'C{VOLTAGE_CHANNEL}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)
     CURRENT_WAVEFORM = device.query_binary_values(str.format(
         f'C{CURRENT_CHANNEL}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)
+    time.sleep(1)
     return VOLTAGE_WAVEFORM, CURRENT_WAVEFORM
 
 
