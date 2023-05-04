@@ -4,6 +4,7 @@ import math as math
 import time
 import sys
 import re
+from dataclasses import dataclass
 
 TOTAL_CHANNELS = 4
 CURRENT_CHANNEL = 3
@@ -24,6 +25,20 @@ global AMP_OFFSET
 AMP_OFFSET = 0
 global SHARED_CHANNELS
 SHARED_CHANNELS = 0
+
+@dataclass
+class oscilloscopedata:
+    oscilloscope_data: tuple
+    oscilloscope_time_array: tuple
+    oscilloscope_voltage_array: tuple
+    oscilloscope_current_array: tuple
+    oscilloscope_power_array: tuple
+    capturetime = float
+    errorcounts = int
+    errortime = float
+    capturerawlength = int
+    capturetrimlength = int
+    sparsing = int
 
 try:
     rm = visa.ResourceManager()
@@ -174,7 +189,10 @@ def captureAllSingle(Samples, Time_Scale):
     u_sec_set = configureScopeHorizontalAxis(Time_Scale)
 
     SHARED_CHANNELS = 1
-    if (u_sec_set == 5000):
+    if (u_sec_set == 10000):
+        # At 5000 samples, we have 17.5M samples per screen instead of just 14
+        Sparsing = np.ceil(Time_Scale/(Samples/100))*SHARED_CHANNELS
+    elif (u_sec_set == 5000):
         # At 5000 samples, we have 17.5M samples per screen instead of just 14
         Sparsing = np.ceil(Time_Scale*17.5/14/(Samples/200))*SHARED_CHANNELS
     elif (u_sec_set == 2000):
@@ -193,7 +211,6 @@ def captureAllSingle(Samples, Time_Scale):
     VOLTAGE_WAVEFORM = []
     CURRENT_WAVEFORM = []
     error_counts = 0
-    orig_length = 0
     while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts == 0)):
         [VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
         if (len(VOLTAGE_WAVEFORM) == 0):
@@ -211,7 +228,7 @@ def captureAllSingle(Samples, Time_Scale):
                     (item - 255) * (VOLT_DIV/25) - VOLT_OFFSET)
             else:
                 VOLTAGE_RESULT.append(item * VOLT_DIV/25 - VOLT_OFFSET)
-        orig_length = len(VOLTAGE_RESULT)
+        oscilloscopedata.oscilloscope_voltage_array = VOLTAGE_RESULT
 
         ################# CURRENT PROCESS #################
         CURRENT_RESULT = []
@@ -221,6 +238,7 @@ def captureAllSingle(Samples, Time_Scale):
                 CURRENT_RESULT.append((item - 255) * (AMP_DIV/25) - AMP_OFFSET)
             else:
                 CURRENT_RESULT.append(item * AMP_DIV/25 - AMP_OFFSET)
+        oscilloscopedata.oscilloscope_current_array = CURRENT_RESULT
 
         ################# TIME PROCESS #################
         SAMPLE_RATE = device.query('SAMPLE_RATE?')
@@ -239,24 +257,37 @@ def captureAllSingle(Samples, Time_Scale):
                 TIME_AXIS.append(
                     TIME_AXIS[0] + (Time_Interval_ms * Sparsing)*i)
         TIME_AXIS = np.array(TIME_AXIS)
+        oscilloscopedata.oscilloscope_time_array = TIME_AXIS
 
-        power_raw = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
+        oscilloscopedata.oscilloscope_power_array = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
 
         # Combine data into one array
         oscilloscope_raw_data = np.stack(
-            (TIME_AXIS, VOLTAGE_RESULT, CURRENT_RESULT, power_raw), axis=0)
+            (oscilloscopedata.oscilloscope_time_array, 
+             oscilloscopedata.oscilloscope_voltage_array,
+             oscilloscopedata.oscilloscope_current_array,
+             oscilloscopedata.oscilloscope_power_array), axis=0)
 
         # Trim to length of one cycle
         [idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)
         [idx_end, val] = findClosestValue(
             oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
-        oscilloscope_trim_data = oscilloscope_raw_data[:, idx_start:idx_end]
-        delta = round(Time_Scale/1000 - oscilloscope_trim_data[0, -1], 1)
-        os_time = time.perf_counter() - start_time
-        return [oscilloscope_trim_data, os_time, error_counts, delta, orig_length, Sparsing]
+        oscilloscopedata.oscilloscope_data = oscilloscope_raw_data[:, idx_start:idx_end]
+        oscilloscopedata.capturerawlength = len(VOLTAGE_WAVEFORM)
+        oscilloscopedata.capturetrimlength = len(oscilloscopedata.oscilloscope_data[0])
+        oscilloscopedata.errortime = round(Time_Scale/1000 - oscilloscopedata.oscilloscope_data[0, -1], 1)
+        oscilloscopedata.capturetime = round(time.perf_counter() - start_time,2)
     else:
-        return [0, 0, error_counts, 1, orig_length, Sparsing]
+        oscilloscopedata.oscilloscope_data = []
+        oscilloscopedata.capturerawlength = 0
+        oscilloscopedata.capturetrimlength = 0
+        oscilloscopedata.errortime = 0
+        oscilloscopedata.capturetime = 0
+        
+    oscilloscopedata.sparsing = Sparsing
+    oscilloscopedata.errorcounts = error_counts
 
+    return oscilloscopedata
 
 def collectOscilloscopeData():
     # send capture to controller

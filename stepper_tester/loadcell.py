@@ -3,6 +3,13 @@ import time
 import RPi.GPIO as GPIO
 from hx711 import HX711
 import numpy as np
+from dataclasses import dataclass
+
+@dataclass
+class loadcelldata:
+    grams: float
+    capturetime: float
+    samples: int
 
 referenceunit = 1085
 samplecount = 5
@@ -11,6 +18,7 @@ hx = HX711(5, 6)
 hx.set_reading_format("MSB", "MSB")
 hx.set_reference_unit(referenceunit)
 hx.reset()
+
 
 
 def close():
@@ -32,10 +40,10 @@ def measure(sampleCount):
         measurements.append(val)
         time.sleep(0.1)
     filtered_data = reject_range_outliers(np.array(measurements))
-    average = np.average(filtered_data)
-    loadcelltime = time.perf_counter()-start
-    samples = len(filtered_data)
-    return average, loadcelltime, samples
+    loadcelldata.grams = np.average(filtered_data)
+    loadcelldata.capturetime = round(time.perf_counter()-start,2)
+    loadcelldata.samples = len(filtered_data)
+    return loadcelldata
 
 
 def reject_range_outliers(data, allowedrange=0.5):

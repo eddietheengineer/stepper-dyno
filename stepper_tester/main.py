@@ -14,24 +14,24 @@ from dataclasses import dataclass
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '4.28.23b'
+test_id = '5.4.23_10mms'
 step_angle = 1.8
 
 speed_start = 10  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
 speed_step = 10  # int(input('Speed Step: ') or 50)
 
-tmc_start = 0.6  # float(input('TMC Current Start: ') or 0.5)
+tmc_start = 1.4  # float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
-tmc_step = 0.2  # float(input('TMC Current Step: ') or 0.1)
+tmc_step = 1.0  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
                   1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
-microstep_array = [16, 32]
+microstep_array = [16]
 
-voltage_start = 12
+voltage_start = 48
 voltage_end = 48
 voltage_step = 12
 
@@ -105,7 +105,7 @@ def main():
                 scope_capture.configureScopeVerticalAxis(
                     voltage_setting, tmc_current)
                 speed = speed_start
-                
+
                 while (speed <= speed_end):
 
                     global TIME_MOVE
@@ -152,7 +152,10 @@ def main():
                         # f5 = executor.submit(klipper_serial.readtemp)
 
                     # Process Load Cell Data
-                    [grams, _, lc_samples] = f3.result()
+                    loadcelldata = f3.result()
+                    grams = loadcelldata.grams
+                    lc_samples = loadcelldata.samples
+
                     if grams < 0:
                         grams = 0
                     torque = grams / 1000 * 9.81 * 135 / 10
@@ -163,17 +166,21 @@ def main():
                                  round(motor_power, 3), lc_samples)
 
                     # Process Power Supply Data
-                    [voltage_actual, power_actual,
-                        _, samples] = f2.result()
+                    powersupplydata = f2.result()
                     powersupply_data_label = (
-                        'v_supply', 'p_supply', 'p_samples')
-                    powersupply_data = (voltage_actual, power_actual, samples)
+                        'measured_voltage', 'p_supply')
+                    powersupply_data = (
+                        powersupplydata.measuredvoltage, powersupplydata.measuredpower)
 
                     # Process Oscilloscope Data
-                    [oscilloscope_raw_data, _, error_count, error_delta, orig_len,
-                        sparsing] = f1.result()
-                    # [oscilloscope_raw_data, _, error_count, error_delta, orig_len,
-                    #    sparsing] = scope_capture.captureAllSingle(SAMPLE_TARGET, Cycle_Length_us)
+                    oscilloscopedata = f1.result()
+
+                    oscilloscope_raw_data = oscilloscopedata.oscilloscope_data
+                    error_count = oscilloscopedata.errorcounts
+                    error_delta = oscilloscopedata.errortime
+                    orig_len = oscilloscopedata.capturerawlength
+                    sparsing = oscilloscopedata.sparsing
+
                     if ((error_count == 0) & (error_delta == 0)):
                         current_max = np.percentile(
                             oscilloscope_raw_data[2], 95)
@@ -241,8 +248,9 @@ def main():
                         if (failcount == 0):
                             # Plot Oscilloscope Data if motor hasn't stalled
                             plotting.plotosData(
-                                output_data, output_data_label, oscilloscope_raw_data[0], oscilloscope_raw_data[1], oscilloscope_raw_data[2], power_raw)
-                            csv_logger.writeoscilloscopedata(output_data, output_data_label, oscilloscope_raw_data)
+                               output_data, output_data_label, oscilloscope_raw_data[0], oscilloscope_raw_data[1], oscilloscope_raw_data[2], power_raw)
+                            csv_logger.writeoscilloscopedata(
+                                output_data, output_data_label, oscilloscope_raw_data)
 
                         # End Speed Iteration
                         speed += speed_step
@@ -256,13 +264,13 @@ def main():
                         klipper_serial.current(tmc_current)
                         cycle_time = (time.perf_counter() - start_time)
                         reset_counter += 1
-                #End Speed Iteration
+                # End Speed Iteration
 
-            #End Current Iteration
+            # End Current Iteration
 
-        #End Microstep Iteration
-    
-    #End Voltage Iteration
+        # End Microstep Iteration
+
+    # End Voltage Iteration
 
     # csvprocess.plotSummaryData(model_number)
     shutdown_dyno()
