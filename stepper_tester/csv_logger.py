@@ -41,6 +41,8 @@ def writeoscilloscopedata(output_data, index_data, oscilloscope_data):
     csvfilepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Data/{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}V_{Microstep}ms_{Current}A_{Speed}mms.zip'
     oscilloscope_data_transposed = np.transpose(oscilloscope_data)
 
-    DF = pd.DataFrame(oscilloscope_data_transposed, columns=['Time (ms)', 'Voltage (V)', 'Current (A)', 'Power (W)'])
-    DF.round({'Time (ms)':8, 'Voltage (V)':4, 'Current (A)':4, 'Power (W)':4})
+    DF = pd.DataFrame(oscilloscope_data_transposed, columns=[
+                      'Time (ms)', 'Voltage (V)', 'Current (A)', 'Power (W)'])
+    DF.round({'Time (ms)': 8, 'Voltage (V)': 4,
+             'Current (A)': 4, 'Power (W)': 4})
     DF.to_csv(csvfilepath, compression="zip")

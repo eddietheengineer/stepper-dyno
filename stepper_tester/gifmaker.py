@@ -1,7 +1,7 @@
 import os
 # import imageio.v2 as imageio
 import imageio
-from natsort import natsorted, ns
+from natsort import natsorted
 
 png_dir = '/home/pi/Desktop/LDO_42STH48-2504AC_4.22.23/Oscilloscope_Plots/'
 images = []

@@ -5,10 +5,6 @@ riden = Riden(port="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
               baudrate=115200, address=1)
 
 
-def scan():
-    return (riden.get_v_set(), riden.get_v_out(), riden.get_i_out(), riden.get_p_out())
-
-
 def measure(sampleCount):
     start = time.perf_counter()
     measurements_power = []
@@ -23,6 +19,13 @@ def measure(sampleCount):
     return riden.get_v_out(), average_power, powersupplytime, samples
 
 
+def summary(samples):
+    [voltage_actual, power_actual, _, samples] = measure(samples)
+    powersupply_data_label = ('v_supply', 'p_supply', 'p_samples')
+    powersupply_data = (voltage_actual, power_actual, samples)
+    return powersupply_data_label, powersupply_data
+
+
 def reject_range_outliers(data, allowedrange=0.2):
     d = np.abs(data - np.median(data))
     return data[d < allowedrange]
@@ -30,8 +33,8 @@ def reject_range_outliers(data, allowedrange=0.2):
 
 def voltage_setting(voltage):
     riden.set_v_set(voltage)
-    print(f'      Power Supply Voltage: {voltage}V')
     riden.set_output(1)
+    print(f'      Power Supply Voltage: {voltage}V')
 
 
 def initialize(voltage):
