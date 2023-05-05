@@ -12,7 +12,7 @@ def findindex(data):
 
 def outputdata(model_number, test_id):
     filename = f'/home/pi/Desktop/{model_number}/{model_number}_{test_id}_Summary.csv'
-    data = np.genfromtxt(f'/home/pi/Desktop/{model_number}/{model_number}_{test_id}_Summary.csv', delimiter=',')
+    data = np.genfromtxt(filename, delimiter=',')
     idx = findindex(data)
     array = np.split(data, idx)
     return array
@@ -22,9 +22,9 @@ def defineindexes(model_number, test_id):
     array = outputdata(model_number, test_id)
     voltages = []
     currents = []
-    for x in range(len(array)):
-        voltages.append(array[x][1, 2])
-        currents.append(array[x][1, 3])
+    for _, value in enumerate(array):
+        voltages.append(value[1, 2])
+        currents.append(value[1, 3])
     return voltages, currents
 
 
@@ -131,7 +131,8 @@ def plotSummaryData(model_number, test_id):
     plotter.xlabel("Speed (mm/s)")
     plotter.ylabel("Driver Power (W)")
 
-    plotter.savefig(f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
+    plotter.savefig(
+        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
     plotter.clf()
     plotter.close()
 
@@ -179,7 +180,8 @@ def plotSummaryData(model_number, test_id):
     plotter.xlabel("Speed (mm/s)")
     plotter.ylabel("RMS Current (A)")
 
-    plotter.savefig(f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
+    plotter.savefig(
+        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
     plotter.clf()
     plotter.close()
 
@@ -227,7 +229,8 @@ def plotSummaryData(model_number, test_id):
     plotter.xlabel("Speed (mm/s)")
     plotter.ylabel("RMS Voltage (V))")
 
-    plotter.savefig(f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
+    plotter.savefig(
+        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
     plotter.clf()
     plotter.close()
 
@@ -275,6 +278,7 @@ def plotSummaryData(model_number, test_id):
     plotter.xlabel("Speed (mm/s)")
     plotter.ylabel("Test Torque (N-cm)")
 
-    plotter.savefig(f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
+    plotter.savefig(
+        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
     plotter.clf()
     plotter.close()

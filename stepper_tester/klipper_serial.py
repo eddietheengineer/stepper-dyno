@@ -1,8 +1,8 @@
+#Klipper Serial Communicator
 import serial
 import io
 import string
 import re
-
 
 def restart():
     ser = serial.Serial(
@@ -27,7 +27,7 @@ def move(time, speed, acceleration):
         "/home/pi/printer_data/comms/klippy.serial", baudrate=250000)
     distance = time * speed - (speed * speed / acceleration)
     move_command = "MANUAL_STEPPER SET_POSITION=0 STEPPER=stepper_M3 ENABLE=1 \
-		SPEED=" + str(speed) + " ACCEL=" + str(acceleration) + " MOVE=" + str(distance) + "\n"
+        SPEED=" + str(speed) + " ACCEL=" + str(acceleration) + " MOVE=" + str(distance) + "\n"
     ser.write(str.encode(move_command))
     ser.close()
 

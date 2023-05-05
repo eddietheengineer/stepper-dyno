@@ -11,19 +11,12 @@ CURRENT_CHANNEL = 3
 VOLTAGE_CHANNEL = 1
 
 # Oscilloscope Settings:
-global TIME_DIV
 TIME_DIV = 0
-global TRIG_DELAY
 TRIG_DELAY = 0
-global VOLT_DIV
 VOLT_DIV = 0
-global AMP_DIV
 AMP_DIV = 0
-global VOLT_OFFSET
 VOLT_OFFSET = 0
-global AMP_OFFSET
 AMP_OFFSET = 0
-global SHARED_CHANNELS
 SHARED_CHANNELS = 0
 
 @dataclass
@@ -47,10 +40,10 @@ try:
     # device = rm.open_resource('TCPIP::10.10.10.163::INSTR',query_delay=0.25)
     device = rm.open_resource('TCPIP::192.168.1.128::INSTR', query_delay=0.25)
 
-except:
+except Exception:
     print('      Failed to connect to oscilloscope')
     sys.exit(0)
-device.timeout = 30000
+device.timeout = 5000
 
 
 def startChannels():
@@ -80,7 +73,7 @@ def setupScope():
     device.write('ACQUIRE_WAY SAMPLING')
 
     # Set Trigger Mode
-    device.write(f'TRIG_MODE SINGLE')
+    device.write('TRIG_MODE NORMAL')
     # Set Trigger Level to 0V
     device.write(f'C{CURRENT_CHANNEL}:TRIG_LEVEL 100mV')
     # Set Trigger Coupling to AC
@@ -91,7 +84,7 @@ def setupScope():
     device.write(f'C{CURRENT_CHANNEL}:TRIG_SLOPE POS')
 
     # set memory depth to 14M Samples
-    device.write('MEMORY_SIZE 14M')
+    # device.write('MEMORY_SIZE 14M')
     # Turn Off Persistent Display
     device.write('PERSIST OFF')
 
@@ -128,7 +121,8 @@ def configureScopeHorizontalAxis(CaptureTime_us):
     TimePerDivisionRaw_us = CaptureTime_us / 14
 
     # Find closest option available to raw value
-    [x, TimePerDivision_us] = findFirstInstanceGreaterThan(TimePerDivisionOptions_us, TimePerDivisionRaw_us)
+    [_, TimePerDivision_us] = findFirstInstanceGreaterThan(
+        TimePerDivisionOptions_us, TimePerDivisionRaw_us)
 
     # Set Trigger Delay so T=0 is on left of screen
     TriggerDelay_us = -TimePerDivision_us*7
@@ -138,7 +132,6 @@ def configureScopeHorizontalAxis(CaptureTime_us):
         device.write(f'TRIG_DELAY {TriggerDelay_us}US')
         TIME_DIV = TimePerDivision_us
         TRIG_DELAY = TriggerDelay_us
-    return TimePerDivision_us
 
 
 def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
@@ -149,7 +142,8 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     VoltsPerDivision_V = math.ceil(inputVoltage/4*2)
     if (VoltsPerDivision_V != VOLT_DIV):
         device.write(f'C{VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_V}V')
-        print(f'      Updated VOLT DIV Old:{VOLT_DIV}, New:{VoltsPerDivision_V}')
+        print(
+            f'      Updated VOLT DIV Old:{VOLT_DIV}, New:{VoltsPerDivision_V}')
         VOLT_DIV = VoltsPerDivision_V
 
     # Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
@@ -161,9 +155,9 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
 
 
 def findFirstInstanceGreaterThan(array, value):
-    for x in range(len(array)):
-        if array[x] > value:
-            return [x, array[x]]
+    for x, arrayvalue in enumerate(array):
+        if arrayvalue > value:
+            return [x, arrayvalue]
 
 
 def findClosestValue(array, value):
@@ -172,37 +166,30 @@ def findClosestValue(array, value):
     return [idx, array[idx]]
 
 
-def captureAllSingle(Samples, Time_Scale):
-    global VOLT_DIV
-    global VOLT_OFFSET
-
-    global AMP_DIV
-    global AMP_OFFSET
-
-    global TIME_DIV
-    global TRIG_DELAY
-
-    global SHARED_CHANNELS
-
-    start_time = time.perf_counter()
-
-    u_sec_set = configureScopeHorizontalAxis(Time_Scale)
-
-    SHARED_CHANNELS = 1
-    if (u_sec_set == 10000):
-        # At 5000 samples, we have 17.5M samples per screen instead of just 14
-        Sparsing = np.ceil(Time_Scale/(Samples/100))*SHARED_CHANNELS
-    elif (u_sec_set == 5000):
-        # At 5000 samples, we have 17.5M samples per screen instead of just 14
-        Sparsing = np.ceil(Time_Scale*17.5/14/(Samples/200))*SHARED_CHANNELS
-    elif (u_sec_set == 2000):
-        Sparsing = np.ceil(Time_Scale/(Samples/500))*SHARED_CHANNELS
+def setSparsing(Samples, Time_Scale):
+    if (TIME_DIV == 10000):
+        Sparsing = int(np.ceil(Time_Scale/(Samples/100))*SHARED_CHANNELS)
+    elif (TIME_DIV == 5000):
+        # At 5ms/div, we have 17.5M samples per screen instead of just 14
+        Sparsing = int(np.ceil(Time_Scale*17.5/14 /
+                       (Samples/200))*SHARED_CHANNELS)
+    elif (TIME_DIV == 2000):
+        Sparsing = int(np.ceil(Time_Scale/(Samples/500))*SHARED_CHANNELS)
     else:
-        Sparsing = np.ceil(Time_Scale/(Samples/1000))*SHARED_CHANNELS
+        Sparsing = int(np.ceil(Time_Scale/(Samples/1000))*SHARED_CHANNELS)
+    return Sparsing
+
+
+def captureAllSingle(Samples, Time_Scale):
+
+    configureScopeHorizontalAxis(Time_Scale)
+
+    Sparsing = setSparsing(Samples, Time_Scale)
 
     # Setup waveform capture
     device.write(str.format(f'WAVEFORM_SETUP SP,{Sparsing},NP,{Samples},FP,0'))
     # Start Capture
+    time.sleep(1)
     device.write('ARM')
     device.write('WAIT')
     time.sleep(1)
@@ -211,6 +198,7 @@ def captureAllSingle(Samples, Time_Scale):
     VOLTAGE_WAVEFORM = []
     CURRENT_WAVEFORM = []
     error_counts = 0
+
     while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts == 0)):
         [VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
         if (len(VOLTAGE_WAVEFORM) == 0):
@@ -269,9 +257,10 @@ def captureAllSingle(Samples, Time_Scale):
              oscilloscopedata.oscilloscope_power_array), axis=0)
 
         # Trim to length of one cycle
-        [idx_start, val] = findClosestValue(oscilloscope_raw_data[0], 0)
-        [idx_end, val] = findClosestValue(
+        [idx_start, _] = findClosestValue(oscilloscope_raw_data[0], 0)
+        [idx_end, _] = findClosestValue(
             oscilloscope_raw_data[0], (Initial_Time_Value + Time_Scale/1000))
+
         oscilloscopedata.oscilloscope_data = oscilloscope_raw_data[:, idx_start:idx_end]
         oscilloscopedata.capturerawlength = len(VOLTAGE_WAVEFORM)
         oscilloscopedata.capturetrimlength = len(oscilloscopedata.oscilloscope_data[0])
@@ -300,6 +289,7 @@ def collectOscilloscopeData():
         f'C{VOLTAGE_CHANNEL}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)
     CURRENT_WAVEFORM = device.query_binary_values(str.format(
         f'C{CURRENT_CHANNEL}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)
+    time.sleep(1)
     return VOLTAGE_WAVEFORM, CURRENT_WAVEFORM
 
 
@@ -340,4 +330,4 @@ def parameterMeasureRead():
         device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? RMS'))
     current_pk = parseOscilloscopeResponse(
         device.query(f'C{CURRENT_CHANNEL}:PARAMETER_VALUE? PKPK'))
-    return round(volt_rms, 1), round(volt_pk, 1), round(current_rms, 3), round(current_pk, 3)
+    return volt_rms, volt_pk, current_rms, current_pk

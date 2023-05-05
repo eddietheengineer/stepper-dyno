@@ -44,3 +44,4 @@ def writeoscilloscopedata(output_data, index_data, oscilloscope_data):
     DF = pd.DataFrame(oscilloscope_data_transposed, columns=['Time (ms)', 'Voltage (V)', 'Current (A)', 'Power (W)'])
     DF.round({'Time (ms)':8, 'Voltage (V)':4, 'Current (A)':4, 'Power (W)':4})
     DF.to_csv(csvfilepath)
+
