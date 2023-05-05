@@ -39,7 +39,7 @@ voltage_step = 36
 reset_counter = 1
 
 ACCELERATION = 10000
-SAMPLE_TARGET = 500000
+SAMPLE_TARGET = 501000
 
 TIME_MOVE = 10
 CYCLES_MEASURED = 2
@@ -190,7 +190,7 @@ def main():
                         temperaturedata.rpitemp, temperaturedata.drivertemp, temperaturedata.steppertemp)
 
                     # Check if oscilloscope actually captured data
-                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime, 1) < 1)):
+                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime,1) < 5)):
 
                         # Check if motor has stalled
                         if (loadcelldata.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):

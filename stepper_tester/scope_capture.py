@@ -15,6 +15,7 @@ TIME_DIV = 0
 TRIG_DELAY = 0
 VOLT_DIV = 0
 AMP_DIV = 0
+SAMPLE_RATE = 0
 VOLT_OFFSET = 0
 AMP_OFFSET = 0
 SHARED_CHANNELS = 0
@@ -164,7 +165,6 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
         print(f'      Updated AMP DIV Old:{AMP_DIV}, New:{AmpsPerDivision_A}')
         AMP_DIV = AmpsPerDivision_A
 
-
 def findFirstInstanceGreaterThan(array, value):
     for x, arrayvalue in enumerate(array):
         if arrayvalue > value:
@@ -181,16 +181,17 @@ def setSparsing(Samples, Time_Scale):
     #Allow 5% buffer in case of strange edge case
     Margin = 0.95
     if (TIME_DIV == 20000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/50))/SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples/50)/SHARED_CHANNELS))
     elif (TIME_DIV == 10000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/100))/SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples/100)/SHARED_CHANNELS))
     elif (TIME_DIV == 5000):
         # At 5ms/div, we have 17.5M samples per screen instead of just 14
-        Sparsing = int(np.ceil(Time_Scale*17.5/14/(Samples*Margin/200))/SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale*17.5/14/(Samples/200)/SHARED_CHANNELS))
     elif (TIME_DIV == 2000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/500))/SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples/500)/SHARED_CHANNELS))
     else:
-        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/1000))/SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples/1000)/SHARED_CHANNELS))
+    
     return Sparsing
 
 
