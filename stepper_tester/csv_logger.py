@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-
+from dataclass_csv import DataclassWriter
 
 def writeheader(model_number, test_id, label):
     filepath = f'/home/pi/Desktop/{model_number}_{test_id}/'
@@ -21,6 +21,17 @@ def writedata(model_number, test_id, data):
     with open(csvfilepath, "a", encoding='UTF-8') as file:
         file.write(str(data)[1:-1]+'\n')
     file.close()
+
+# def writedataclass(testid):
+#     filepath = f'/home/pi/Desktop/{testid.stepper_model}_{testid.test_id}/'
+#     csvfilepath = f'/{testid.stepper_model}_{testid.test_id}_Summary.csv'
+
+#     if not os.path.exists(filepath):
+#         os.makedirs(filepath)
+
+#     with open(csvfilepath, "w+", encoding='UTF-8') as file:
+#         w = DataclassWriter(file, testdata, TestPointData)
+#         w.write()
 
 
 def writeoscilloscopedata(output_data, index_data, oscilloscope_data):

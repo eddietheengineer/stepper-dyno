@@ -13,7 +13,7 @@ from dataclasses import dataclass, fields
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.5'
+test_id = '5.5.2023a'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -39,7 +39,7 @@ voltage_step = 36
 reset_counter = 1
 
 ACCELERATION = 10000
-SAMPLE_TARGET = 500001
+SAMPLE_TARGET = 500000
 
 TIME_MOVE = 10
 CYCLES_MEASURED = 2
@@ -50,7 +50,7 @@ cycle_time = 0
 
 
 @dataclass
-class TestPointData():
+class TestIdData():
     stepper_model: str
     test_id: str
     test_counter: int
@@ -58,22 +58,6 @@ class TestPointData():
     test_microstep: int
     test_current: float
     test_speed: int
-    powersupplyvoltage: float
-    powersupplycurrent_a: float
-    powersupplypower_w: float
-    oscilloscopecurrentrms_a: float
-    oscilloscopecurrentpeak_a: float
-    oscilloscopevoltagerms_v: float
-    oscilloscopepower_w: float
-    oscilloscopesamplecount: int
-    loadcellload_g: float
-    loadcelltorque_ncm: float
-    loadcellmotoroutputpower_w: float
-    temperaturepi_c: float
-    temperaturedriver_c: float
-    temperaturestepper_c: float
-    cycletime_s: float
-    movetime_s: float
 
 
 @dataclass
@@ -187,12 +171,11 @@ def main():
                         powersupplydata.measuredvoltage, powersupplydata.measuredpower)
 
                     # Process Oscilloscope Data
-                    oscilloscopedata = f1.result()
+                    oscilloscopedata, oscilloscoperawdata = f1.result()
                     #oscilloscope_data_label1 = tuple(field.name for field in fields(oscilloscopedata))[4:]
                     oscilloscope_data_label = (
                         'voltage_rms', 'current_pkpk', 'current_rms',  'current_average', 'power_average', 'power_max')
-                    oscilloscope_data = (oscilloscopedata.voltage_rms, oscilloscopedata.current_pk, oscilloscopedata.current_rms,
-                                         oscilloscopedata.current_av, oscilloscopedata.power_av, oscilloscopedata.power_pk)
+                    oscilloscope_data = (oscilloscopedata.voltage_rms, oscilloscopedata.current_pk, oscilloscopedata.current_rms, oscilloscopedata.current_av, oscilloscopedata.power_av, oscilloscopedata.power_pk)
 
                     oscilloscope_reference_label = (
                         'sparsing', 'orig_samples', 'trim_samples', 'error_delta', 'errors')
@@ -207,7 +190,7 @@ def main():
                         temperaturedata.rpitemp, temperaturedata.drivertemp, temperaturedata.steppertemp)
 
                     # Check if oscilloscope actually captured data
-                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime, 1) == 0)):
+                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime, 1) < 1)):
 
                         # Check if motor has stalled
                         if (loadcelldata.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):

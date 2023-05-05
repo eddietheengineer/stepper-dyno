@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 
 TOTAL_CHANNELS = 4
-CURRENT_CHANNEL = 3
+CURRENT_CHANNEL = 2
 VOLTAGE_CHANNEL = 1
 
 # Oscilloscope Settings:
@@ -21,10 +21,6 @@ SHARED_CHANNELS = 0
 
 @dataclass
 class oscilloscopedata:
-    oscilloscope_time_array: tuple
-    oscilloscope_voltage_array: tuple
-    oscilloscope_current_array: tuple
-    oscilloscope_power_array: tuple
     capturetime = float
     errorcounts = int
     errortime = float
@@ -40,6 +36,13 @@ class oscilloscopedata:
     power_av: float
     power_rms: float
     power_pk: float
+
+@dataclass
+class oscilloscoperawdata:
+    oscilloscope_time_array: tuple
+    oscilloscope_voltage_array: tuple
+    oscilloscope_current_array: tuple
+    oscilloscope_power_array: tuple
 
 try:
     rm = visa.ResourceManager()
@@ -68,9 +71,9 @@ def startChannels():
 
 
         if ((channelStatus[0] == 1 & channelStatus[1] == 1) | (channelStatus[2] == 1 & channelStatus[3] == 1)):
-            SHARED_CHANNELS = 2  # warning this doesn't make sense
+            SHARED_CHANNELS = 2
         else:
-            SHARED_CHANNELS = 1  # warning this doesn't make sense
+            SHARED_CHANNELS = 1
 
 
 def setupScope():
@@ -125,7 +128,7 @@ def configureScopeHorizontalAxis(CaptureTime_us):
     TimePerDivisionOptions_us = [1, 2, 5, 10, 20, 50, 100,
                                  200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]
 
-    # Display is 14 sections wide, add 10% buffer
+    # Display is 14 sections wide
     TimePerDivisionRaw_us = CaptureTime_us / 14
 
     # Find closest option available to raw value
@@ -175,17 +178,19 @@ def findClosestValue(array, value):
 
 
 def setSparsing(Samples, Time_Scale):
+    #Allow 5% buffer in case of strange edge case
+    Margin = 0.95
     if (TIME_DIV == 20000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples/50))*SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/50))/SHARED_CHANNELS)
     elif (TIME_DIV == 10000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples/100))*SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/100))/SHARED_CHANNELS)
     elif (TIME_DIV == 5000):
         # At 5ms/div, we have 17.5M samples per screen instead of just 14
-        Sparsing = int(np.ceil(Time_Scale*17.5/14/(Samples/200))*SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale*17.5/14/(Samples*Margin/200))/SHARED_CHANNELS)
     elif (TIME_DIV == 2000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples/500))*SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/500))/SHARED_CHANNELS)
     else:
-        Sparsing = int(np.ceil(Time_Scale/(Samples/1000))*SHARED_CHANNELS)
+        Sparsing = int(np.ceil(Time_Scale/(Samples*Margin/1000))/SHARED_CHANNELS)
     return Sparsing
 
 
@@ -254,36 +259,36 @@ def captureAllSingle(Samples, Time_Scale):
 
         # Trim to length of one cycle
         [idx_start, _] = findClosestValue(TIME_AXIS, 0)
-        [idx_end, _] = findClosestValue(TIME_AXIS, (Initial_Time_Value + Time_Scale/1000))
+        [idx_end, val_end] = findClosestValue(TIME_AXIS, (Initial_Time_Value + Time_Scale/1000))
         
-        oscilloscopedata.oscilloscope_time_array = TIME_AXIS[idx_start:idx_end]
-        oscilloscopedata.oscilloscope_voltage_array = VOLTAGE_RESULT[idx_start:idx_end]
-        oscilloscopedata.oscilloscope_current_array = CURRENT_RESULT[idx_start:idx_end]
-        oscilloscopedata.oscilloscope_power_array = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)[idx_start:idx_end]
+        oscilloscoperawdata.oscilloscope_time_array = TIME_AXIS[idx_start:idx_end]
+        oscilloscoperawdata.oscilloscope_voltage_array = VOLTAGE_RESULT[idx_start:idx_end]
+        oscilloscoperawdata.oscilloscope_current_array = CURRENT_RESULT[idx_start:idx_end]
+        oscilloscoperawdata.oscilloscope_power_array = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)[idx_start:idx_end]
 
         oscilloscopedata.capturerawlength = len(VOLTAGE_WAVEFORM)
-        oscilloscopedata.capturetrimlength = len(oscilloscopedata.oscilloscope_voltage_array)
-        oscilloscopedata.errortime = round(Time_Scale/1000 - oscilloscopedata.oscilloscope_time_array[-1], 1)
+        oscilloscopedata.capturetrimlength = len(oscilloscoperawdata.oscilloscope_voltage_array)
+        oscilloscopedata.errortime = abs(round((Time_Scale/1000 - oscilloscoperawdata.oscilloscope_time_array[-1])/(Time_Scale/1000)*100, 2))
 
-        oscilloscopedata.current_pk = round(np.percentile(oscilloscopedata.oscilloscope_current_array,95), 2)
-        oscilloscopedata.current_rms = round(np.sqrt(np.mean(np.square(oscilloscopedata.oscilloscope_current_array))), 3)
-        oscilloscopedata.current_av = round(np.average(np.absolute(oscilloscopedata.oscilloscope_current_array)),3)
+        oscilloscopedata.current_pk = round(np.percentile(oscilloscoperawdata.oscilloscope_current_array,95), 2)
+        oscilloscopedata.current_rms = round(np.sqrt(np.mean(np.square(oscilloscoperawdata.oscilloscope_current_array))), 3)
+        oscilloscopedata.current_av = round(np.average(np.absolute(oscilloscoperawdata.oscilloscope_current_array)),3)
 
-        oscilloscopedata.voltage_pk = round(np.percentile(oscilloscopedata.oscilloscope_voltage_array,95), 2)
-        oscilloscopedata.voltage_rms = round(np.sqrt(np.mean(np.square(oscilloscopedata.oscilloscope_voltage_array))), 2)
-        oscilloscopedata.voltage_av = round(np.average(np.absolute(oscilloscopedata.oscilloscope_voltage_array)),3)
+        oscilloscopedata.voltage_pk = round(np.percentile(oscilloscoperawdata.oscilloscope_voltage_array,95), 2)
+        oscilloscopedata.voltage_rms = round(np.sqrt(np.mean(np.square(oscilloscoperawdata.oscilloscope_voltage_array))), 2)
+        oscilloscopedata.voltage_av = round(np.average(np.absolute(oscilloscoperawdata.oscilloscope_voltage_array)),3)
 
-        oscilloscopedata.power_pk = round(np.percentile(oscilloscopedata.oscilloscope_power_array, 95), 2)
-        oscilloscopedata.power_rms = round(np.sqrt(np.mean(np.square(oscilloscopedata.oscilloscope_power_array))), 3)
-        oscilloscopedata.power_av = round(np.average(oscilloscopedata.oscilloscope_power_array)*2, 2)
+        oscilloscopedata.power_pk = round(np.percentile(oscilloscoperawdata.oscilloscope_power_array, 95), 2)
+        oscilloscopedata.power_rms = round(np.sqrt(np.mean(np.square(oscilloscoperawdata.oscilloscope_power_array))), 3)
+        oscilloscopedata.power_av = round(np.average(oscilloscoperawdata.oscilloscope_power_array)*2, 2)
 
         oscilloscopedata.capturetime = round(time.perf_counter() - start_time,2)
 
     else:
-        oscilloscopedata.oscilloscope_time_array = []
-        oscilloscopedata.oscilloscope_voltage_array = []
-        oscilloscopedata.oscilloscope_current_array = []
-        oscilloscopedata.oscilloscope_power_array = []
+        oscilloscoperawdata.oscilloscope_time_array = []
+        oscilloscoperawdata.oscilloscope_voltage_array = []
+        oscilloscoperawdata.oscilloscope_current_array = []
+        oscilloscoperawdata.oscilloscope_power_array = []
 
         oscilloscopedata.capturerawlength = 0
         oscilloscopedata.capturetrimlength = 0
@@ -305,7 +310,7 @@ def captureAllSingle(Samples, Time_Scale):
     oscilloscopedata.sparsing = Sparsing
     oscilloscopedata.errorcounts = error_counts
 
-    return oscilloscopedata
+    return oscilloscopedata, oscilloscoperawdata
 
 def collectOscilloscopeData():
     # send capture to controller
