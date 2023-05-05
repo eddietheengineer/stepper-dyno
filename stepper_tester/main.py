@@ -146,7 +146,7 @@ def main():
 
                     # Start threads for measurement devices
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        f3 = executor.submit(loadcell.summary, speed, 7)
+                        f3 = executor.submit(loadcell.measure, 7)
                         f2 = executor.submit(powersupply.summary, 10)
                         f1 = executor.submit(
                             scope_capture.summary, SAMPLE_TARGET, Cycle_Length_us)
@@ -154,7 +154,19 @@ def main():
                         #f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
                     # Process Load Cell Data
-                    mech_data_label, mech_data = f3.result()
+                    #mech_data_label, mech_data = f3.result()
+                    loadcelldata = f3.result()
+                    grams = loadcelldata.grams
+                    lc_samples = loadcelldata.samples
+
+                    if grams < 0:
+                        grams = 0
+                    torque = grams / 1000 * 9.81 * 135 / 10
+                    motor_power = torque / 100 * speed * 2 * 3.1415/40
+                    mech_data_label = ('grams', 'torque',
+                                       'motor_power', 'lc_samples')
+                    mech_data = (round(grams, 3), round(torque, 3),
+                                 round(motor_power, 3), lc_samples)
 
                     # Process Power Supply Data
                     powersupply_data_label, powersupply_data = f2.result()
