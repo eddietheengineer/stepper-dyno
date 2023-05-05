@@ -197,7 +197,8 @@ def main():
                     temperaturedata = klipper_serial.readtemp()
                     temperature_label = (
                         'rpi_temp', 'driver_temp', 'stepper_temp')
-                    temperature_data = (temperaturedata.rpitemp, temperaturedata.drivertemp, temperaturedata.steppertemp)
+                    temperature_data = (
+                        temperaturedata.rpitemp, temperaturedata.drivertemp, temperaturedata.steppertemp)
 
                     # Check if oscilloscope actually captured data
                     if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime, 1) == 0)):
@@ -217,9 +218,9 @@ def main():
                         #     plotting.plotosData(output_data, output_data_label, oscilloscopedata.oscilloscope_time_array, oscilloscopedata.oscilloscope_voltage_array,
                         #                         oscilloscopedata.oscilloscope_current_array, oscilloscopedata.oscilloscope_power_array)
                         #     csv_logger.writeoscilloscopedata(output_data, output_data_label, np.stack(
-                        #         oscilloscopedata.oscilloscope_time_array, 
-                        #         oscilloscopedata.oscilloscope_voltage_array, 
-                        #         oscilloscopedata.oscilloscope_current_array, 
+                        #         oscilloscopedata.oscilloscope_time_array,
+                        #         oscilloscopedata.oscilloscope_voltage_array,
+                        #         oscilloscopedata.oscilloscope_current_array,
                         #         oscilloscopedata.oscilloscope_power_array), axis=0)
 
                         # Process Cycle Data
