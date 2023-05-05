@@ -147,14 +147,13 @@ def main():
                     # Start threads for measurement devices
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         f3 = executor.submit(loadcell.measure, 7)
-                        f2 = executor.submit(powersupply.summary, 10)
+                        f2 = executor.submit(powersupply.measure, 10)
                         f1 = executor.submit(
                             scope_capture.summary, SAMPLE_TARGET, Cycle_Length_us)
                         # f4 = executor.submit(klipper_serial.readtemp)
                         #f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
                     # Process Load Cell Data
-                    #mech_data_label, mech_data = f3.result()
                     loadcelldata = f3.result()
                     grams = loadcelldata.grams
                     lc_samples = loadcelldata.samples
@@ -169,7 +168,11 @@ def main():
                                  round(motor_power, 3), lc_samples)
 
                     # Process Power Supply Data
-                    powersupply_data_label, powersupply_data = f2.result()
+                    powersupplydata = f2.result()
+                    powersupply_data_label = (
+                        'measured_voltage', 'p_supply')
+                    powersupply_data = (
+                        powersupplydata.measuredvoltage, powersupplydata.measuredpower)
 
                     # Process Oscilloscope Data
                     _, oscilloscope_data_label, oscilloscope_data, oscilloscope_reference_label, oscilloscope_reference_data = f1.result()
