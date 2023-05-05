@@ -8,6 +8,8 @@ from dataclasses import dataclass
 @dataclass
 class loadcelldata:
     grams: float
+    torque: float
+    motorpower: float
     capturetime: float
     samples: int
 
@@ -29,7 +31,7 @@ def tare():
     print("      Tared Loadcell")
 
 
-def measure(sampleCount):
+def measure(sampleCount, speed):
     start = time.perf_counter()
     measurements = []
     for _ in range(sampleCount):
@@ -37,7 +39,11 @@ def measure(sampleCount):
         measurements.append(val)
         time.sleep(0.1)
     filtered_data = reject_range_outliers(np.array(measurements))
-    loadcelldata.grams = round(np.average(filtered_data),2)
+
+    loadcelldata.grams = max(np.average(filtered_data),0)
+
+    loadcelldata.torque = loadcelldata.grams / 1000 * 9.81 * 135 / 10
+    loadcelldata.motorpower = loadcelldata.torque / 100 * speed * 2 * 3.1415/40
     loadcelldata.capturetime = round(time.perf_counter()-start,2)
     loadcelldata.samples = len(filtered_data)
     return loadcelldata
