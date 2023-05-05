@@ -8,14 +8,12 @@ import concurrent.futures
 import csv_logger
 import sys
 import change_config
-import audio_capture
 import plotting
-import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.4.2023_no_load1'
+test_id = '5.5'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -41,7 +39,7 @@ voltage_step = 36
 reset_counter = 1
 
 ACCELERATION = 10000
-SAMPLE_TARGET = 500000
+SAMPLE_TARGET = 500001
 
 TIME_MOVE = 10
 CYCLES_MEASURED = 2
@@ -89,6 +87,13 @@ class PowerSummary():
     motorpower_miscerror = float
     motorpower_output = float
 
+
+@dataclass
+class IterativeData():
+    voltage_setting: int
+    microstep_setting: int
+    current_setting: float
+    speed_setting: int
 
 def main():
 
@@ -161,7 +166,7 @@ def main():
 
                     # Start threads for measurement devices
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        f3 = executor.submit(loadcell.measure, 7, speed)
+                        f3 = executor.submit(loadcell.measure, 10, speed)
                         f2 = executor.submit(powersupply.measure, 10)
                         f1 = executor.submit(
                             scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us)
@@ -170,19 +175,20 @@ def main():
 
                     # Process Load Cell Data
                     loadcelldata = f3.result()
-                    mech_data_label = ('grams', 'torque',
-                                       'motor_power', 'lc_samples')
+
+                    mech_data_label = tuple(field.name for field in fields(loadcelldata))
                     mech_data = (round(loadcelldata.grams, 3), round(loadcelldata.torque, 3), round(
                         loadcelldata.motorpower, 3), loadcelldata.samples)
 
                     # Process Power Supply Data
                     powersupplydata = f2.result()
-                    powersupply_data_label = ('measured_voltage', 'p_supply')
+                    powersupply_data_label = tuple(field.name for field in fields(powersupplydata))
                     powersupply_data = (
                         powersupplydata.measuredvoltage, powersupplydata.measuredpower)
 
                     # Process Oscilloscope Data
                     oscilloscopedata = f1.result()
+                    #oscilloscope_data_label1 = tuple(field.name for field in fields(oscilloscopedata))[4:]
                     oscilloscope_data_label = (
                         'voltage_rms', 'current_pkpk', 'current_rms',  'current_average', 'power_average', 'power_max')
                     oscilloscope_data = (oscilloscopedata.voltage_rms, oscilloscopedata.current_pk, oscilloscopedata.current_rms,
@@ -227,22 +233,6 @@ def main():
                         cycle_time = (time.perf_counter() - start_time)
                         cycle_data_label = ('cycle_time', 'TIME_MOVE')
                         cycle_data = (round(cycle_time, 2), TIME_MOVE)
-
-                        PowerSummary.motorpower_output = loadcelldata.motorpower
-
-                        PowerSummary.driverpower_in = powersupplydata.measuredpower
-                        PowerSummary.driverpower_out = oscilloscopedata.power_av
-                        PowerSummary.driverpower_loss = PowerSummary.driverpower_in - \
-                            PowerSummary.driverpower_out
-
-                        PowerSummary.motorpower_totalloss = PowerSummary.driverpower_out - \
-                            PowerSummary.motorpower_output
-                        PowerSummary.motorpower_copperloss = 2 * \
-                            oscilloscopedata.current_av**2 * motor_resistance
-                        PowerSummary.motorpower_ironloss = speed * \
-                            oscilloscopedata.current_pk * iron_constant
-                        PowerSummary.motorpower_miscerror = PowerSummary.motorpower_totalloss - \
-                            PowerSummary.motorpower_copperloss - PowerSummary.motorpower_ironloss
 
                         # Combine Output Summary Data
                         output_data_label = iterative_data_label + powersupply_data_label + \
@@ -308,6 +298,18 @@ def shutdown_dyno():
 def find_closest(array, target):
     return min(array, key=lambda x: abs(x - target))
 
+
+def calculatepower(testdata, loadcell, powersupply, oscilloscope):
+    PowerSummary.motorpower_output = loadcell.motorpower
+
+    PowerSummary.driverpower_in = powersupply.measuredpower
+    PowerSummary.driverpower_out = oscilloscope.power_av
+    PowerSummary.driverpower_loss = PowerSummary.driverpower_in - PowerSummary.driverpower_out
+
+    PowerSummary.motorpower_totalloss = PowerSummary.driverpower_out - PowerSummary.motorpower_output
+    PowerSummary.motorpower_copperloss = 2 * oscilloscope.current_av**2 * motor_resistance
+    PowerSummary.motorpower_ironloss = testdata.speed * oscilloscope.current_pk * iron_constant
+    PowerSummary.motorpower_miscerror = PowerSummary.motorpower_totalloss - PowerSummary.motorpower_copperloss - PowerSummary.motorpower_ironloss
 
 if __name__ == "__main__":
 

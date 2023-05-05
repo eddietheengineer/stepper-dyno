@@ -45,7 +45,6 @@ try:
     rm = visa.ResourceManager()
     # Connect to device (Make sure to change the resource locator!)
     # device = rm.open_resource('USB0::62700::60984::SDSMMGKC6R0277::0::INSTR',query_delay=0.25)
-    # device = rm.open_resource('TCPIP::10.10.10.163::INSTR',query_delay=0.25)
     device = rm.open_resource('TCPIP::192.168.1.128::INSTR', query_delay=0.25)
 
 except Exception:
@@ -176,7 +175,9 @@ def findClosestValue(array, value):
 
 
 def setSparsing(Samples, Time_Scale):
-    if (TIME_DIV == 10000):
+    if (TIME_DIV == 20000):
+        Sparsing = int(np.ceil(Time_Scale/(Samples/50))*SHARED_CHANNELS)
+    elif (TIME_DIV == 10000):
         Sparsing = int(np.ceil(Time_Scale/(Samples/100))*SHARED_CHANNELS)
     elif (TIME_DIV == 5000):
         # At 5ms/div, we have 17.5M samples per screen instead of just 14
@@ -206,6 +207,7 @@ def captureAllSingle(Samples, Time_Scale):
     VOLTAGE_WAVEFORM = []
     CURRENT_WAVEFORM = []
     error_counts = 0
+
     while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts == 0)):
         [VOLTAGE_WAVEFORM, CURRENT_WAVEFORM] = collectOscilloscopeData()
         if (len(VOLTAGE_WAVEFORM) == 0):
