@@ -3,6 +3,13 @@ import serial
 import io
 import string
 import re
+from dataclasses import dataclass
+
+@dataclass
+class temperaturedata:
+    rpitemp: float
+    drivertemp: float
+    steppertemp: float
 
 def restart():
     ser = serial.Serial(
@@ -45,4 +52,7 @@ def readtemp():
     temps = [re.findall("\d+\.\d+", value)[0]
              for value in temps_split if value[0] in string.ascii_uppercase]
     ser.close()
-    return tuple(temps)
+    temperaturedata.rpitemp = float(temps[0])
+    temperaturedata.drivertemp = float(temps[1])
+    temperaturedata.steppertemp = float(temps[2])
+    return temperaturedata
