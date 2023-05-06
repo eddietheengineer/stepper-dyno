@@ -7,10 +7,13 @@ import re
 from dataclasses import dataclass
 
 TOTAL_CHANNELS = 4
-CURRENT_CHANNEL = 2
 VOLTAGE_CHANNEL = 1
+CURRENT_CHANNEL = 2
 INPUT_VOLTAGE_CHANNEL = 3
 INPUT_CURRENT_CHANNEL = 4
+
+CHANNEL_LIST = ['VOLTAGE_CHANNEL', 'CURRENT_CHANNEL',
+                'INPUT_VOLTAGE_CHANNEL', 'INPUT_CURRENT_CHANNEL']
 
 # Oscilloscope Settings:
 TIME_DIV = 0
@@ -66,86 +69,69 @@ except Exception:
 device.timeout = 5000
 
 
-def startChannels():
-    global SHARED_CHANNELS
-    channelStatus = [-1, -1, -1, -1]
-    for i in range(1, TOTAL_CHANNELS+1):
-        if ((i == CURRENT_CHANNEL) | (i == VOLTAGE_CHANNEL) | (i==INPUT_VOLTAGE_CHANNEL) | (i==INPUT_CURRENT_CHANNEL)):
-            device.write(f'C{i}:TRACE ON')
-            # print(f'{i} is ON')
-            channelStatus[i-1] = 1
+def initializeChannels(Channel_Definition):
+    for i, val in enumerate(Channel_Definition):
+        if (val == 0):
+            device.write(f'C{i+1}:TRACE OFF')
         else:
-            device.write(f'C{i}:TRACE OFF')
-            # print(f'{i} is OFF')
-            channelStatus[i-1] = 0
+            device.write(f'C{i+1}:TRACE ON')
 
-        if ((channelStatus[0] == 1 & channelStatus[1] == 1) | (channelStatus[2] == 1 & channelStatus[3] == 1)):
-            SHARED_CHANNELS = 2
-        else:
-            SHARED_CHANNELS = 1
+
+def findSharedChannels(Channel_Definition):
+    global SHARED_CHANNELS
+    if (((Channel_Definition[0] != 0) & (Channel_Definition[1] != 0)) |
+       ((Channel_Definition[2] != 0) & (Channel_Definition[3] != 0))):
+        SHARED_CHANNELS = 2
+    else:
+        SHARED_CHANNELS = 1
+
+
+def setTrigger(Channel, LevelmV):
+    # Set Trigger Mode
+    device.write('TRIG_MODE NORMAL')
+    # Set Trigger Level to 0V
+    device.write(f'C{Channel}:TRIG_LEVEL {LevelmV}mV')
+    # Set Trigger Coupling to AC
+    device.write(f'C{Channel}:TRIG_COUPLING DC')
+    # Set Trigger Select to EDGE and Current Channel
+    device.write(f'TRIG_SELECT EDGE, SR, C{Channel}')
+    # Set Trigger Slope Positive
+    device.write(f'C{Channel}:TRIG_SLOPE POS')
+
+
+def configureChannel(Channel, Attenuation, OffsetV, Unit):
+    # Set Voltage Channel to Volts
+    device.write(f'C{Channel}:UNIT {Unit}')
+    # Set Voltage Channel to 10X
+    device.write(f'C{Channel}:ATTENUATION {Attenuation}')
+    # Set Voltage Channel to DC Coupling
+    device.write(f'C{Channel}:COUPLING D1M')
+    # Set Voltage Channel Vertical Offset to 0
+    device.write(f'C{Channel}:OFFSET {OffsetV}V')
 
 
 def setupScope():
     print('      Connected to Oscilloscope')
-    startChannels()
+    initializeChannels(CHANNEL_LIST)
+    findSharedChannels(CHANNEL_LIST)
 
     # use sampling instead of average
     device.write('ACQUIRE_WAY SAMPLING')
 
-    # Set Trigger Mode
-    device.write('TRIG_MODE NORMAL')
-    # Set Trigger Level to 0V
-    device.write(f'C{CURRENT_CHANNEL}:TRIG_LEVEL 100mV')
-    # Set Trigger Coupling to AC
-    device.write(f'C{CURRENT_CHANNEL}:TRIG_COUPLING DC')
-    # Set Trigger Select to EDGE and Current Channel
-    device.write(f'TRIG_SELECT EDGE, SR, C{CURRENT_CHANNEL}')
-    # Set Trigger Slope Positive
-    device.write(f'C{CURRENT_CHANNEL}:TRIG_SLOPE POS')
-
     # set memory depth to 14M Samples
     # device.write('MEMORY_SIZE 14M')
+
     # Turn Off Persistent Display
     device.write('PERSIST OFF')
 
-    # Set Voltage Channel to Volts
-    device.write(f'C{VOLTAGE_CHANNEL}:UNIT V')
-    # Set Voltage Channel to 10X
-    device.write(f'C{VOLTAGE_CHANNEL}:ATTENUATION 10')
-    # Set Voltage Channel to DC Coupling
-    device.write(f'C{VOLTAGE_CHANNEL}:COUPLING D1M')
-    # Set Voltage Channel Vertical Offset to 0
-    device.write(f'C{VOLTAGE_CHANNEL}:OFFSET {VOLT_OFFSET}V')
-
-    # Set Current Channel to Amps
-    device.write(f'C{CURRENT_CHANNEL}:UNIT A')
-    # Set Current Channel to 10X
-    device.write(f'C{CURRENT_CHANNEL}:ATTENUATION 10')
-    # Set Current Channel to DC Coupling
-    device.write(f'C{CURRENT_CHANNEL}:COUPLING D1M')
-    # Set Current Channel Vertical Offset to 0V
-    device.write(f'C{CURRENT_CHANNEL}:OFFSET {AMP_OFFSET}V')
-
-    # Set Voltage Channel to Volts
-    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:UNIT V')
-    # Set Voltage Channel to 10X
-    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:ATTENUATION 10')
-    # Set Voltage Channel to DC Coupling
-    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:COUPLING D1M')
-    # Set Voltage Channel Vertical Offset to 0
-    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:OFFSET {INPUT_VOLT_OFFSET}V')
-
-    # Set Current Channel to Amps
-    device.write(f'C{INPUT_CURRENT_CHANNEL}:UNIT A')
-    # Set Current Channel to 10X
-    device.write(f'C{INPUT_CURRENT_CHANNEL}:ATTENUATION 10')
-    # Set Current Channel to DC Coupling
-    device.write(f'C{INPUT_CURRENT_CHANNEL}:COUPLING D1M')
-    # Set Current Channel Vertical Offset to 0V
-    device.write(f'C{INPUT_CURRENT_CHANNEL}:OFFSET {INPUT_AMP_OFFSET}V')
-
     # Set Buzzer Off
     device.write('BUZZER OFF')
+
+    setTrigger(CURRENT_CHANNEL, 100)
+    configureChannel(VOLTAGE_CHANNEL, 10, VOLT_OFFSET, 'V')
+    configureChannel(CURRENT_CHANNEL, 10, AMP_OFFSET, 'A')
+    configureChannel(INPUT_VOLTAGE_CHANNEL, 10, INPUT_VOLT_OFFSET, 'V')
+    configureChannel(INPUT_CURRENT_CHANNEL, 10, INPUT_AMP_OFFSET, 'A')
 
 
 def configureScopeHorizontalAxis(CaptureTime_us):
@@ -196,14 +182,15 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     # INPUT_VOLTS
     # Set Scaling so that the display shows +/-50% of input voltage
     VoltsPerDivision_inV = math.ceil(inputVoltage*.20 / 8)
-    
+
     # Set Offset Equal to Input Voltage so trace is centered in display
     VoltsOffset_inV = -inputVoltage + VoltsPerDivision_inV
 
     if (VoltsPerDivision_inV != INPUT_VOLT_DIV) | (VoltsOffset_inV != INPUT_VOLT_OFFSET):
         device.write(f'C{INPUT_VOLTAGE_CHANNEL}:OFFSET {VoltsOffset_inV}V')
         time.sleep(0.25)
-        device.write(f'C{INPUT_VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_inV*1000}mV')
+        device.write(
+            f'C{INPUT_VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_inV*1000}mV')
         print(f'IN VOLT OFFSET Old:{INPUT_VOLT_OFFSET}, New:{VoltsOffset_inV}')
         print(f'IN VOLT DIV Old:{INPUT_VOLT_DIV}, New:{VoltsPerDivision_inV}')
         INPUT_VOLT_OFFSET = VoltsOffset_inV
@@ -214,7 +201,8 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     AmpsPerDivision_inA = math.ceil(targetCurrentRms*1.4*1.5/4)
 
     if (AmpsPerDivision_inA != INPUT_AMP_DIV):
-        device.write(f'C{INPUT_CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_inA*1000}mV')
+        device.write(
+            f'C{INPUT_CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_inA*1000}mV')
         print(f'IN AMP DIV Old:{INPUT_AMP_DIV}, New:{AmpsPerDivision_inA}')
         INPUT_AMP_DIV = AmpsPerDivision_inA
 
@@ -251,6 +239,37 @@ def setSparsing(Samples, Time_Scale):
     return Sparsing
 
 
+def processBinaryData(Waveform, Div, Offset):
+    result = []
+    # convert raw data to voltage, P142 in prog manual
+    for item in Waveform:
+        if item > 127:
+            result.append((item - 255) * (Div/25) - Offset)
+        else:
+            result.append(item * Div/25 - Offset)
+    return result
+
+
+def createTimeArray(Samples, Div, Delay, Sparsing):
+    ################# TIME PROCESS #################
+    SAMPLE_RATE = device.query('SAMPLE_RATE?')
+    SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
+    Time_Interval_ms = 1 / SAMPLE_RATE * 1000
+
+    # get time interval, P143 in prog manual
+    Initial_Time_Value = Delay + (Div * 14/2)
+
+    # build time axis array
+    output = []
+    for i in range(Samples):
+        if i == 0:
+            output.append(Initial_Time_Value)
+        elif i > 0:
+            output.append(output[0] + (Time_Interval_ms * Sparsing)*i)
+    output = np.array(output)
+    return output
+
+
 def captureAllSingle(Samples, Time_Scale):
     start_time = time.perf_counter()
 
@@ -278,74 +297,54 @@ def captureAllSingle(Samples, Time_Scale):
             error_counts += 1
 
     output = oscilloscopedata()
+    output.capturerawlength = len(VOLTAGE_WAVEFORM)
 
-    if (len(VOLTAGE_WAVEFORM) != 0):
-        ################# VOLTAGE PROCESS #################
-        VOLTAGE_RESULT = []
-        # convert raw data to voltage, P142 in prog manual
-        for item in VOLTAGE_WAVEFORM:
-            if item > 127:
-                VOLTAGE_RESULT.append(
-                    (item - 255) * (VOLT_DIV/25) - VOLT_OFFSET)
-            else:
-                VOLTAGE_RESULT.append(item * VOLT_DIV/25 - VOLT_OFFSET)
-
-        ################# CURRENT PROCESS #################
-        CURRENT_RESULT = []
-        # convert raw data to voltage, P142 in prog manual
-        for item in CURRENT_WAVEFORM:
-            if item > 127:
-                CURRENT_RESULT.append((item - 255) * (AMP_DIV/25) - AMP_OFFSET)
-            else:
-                CURRENT_RESULT.append(item * AMP_DIV/25 - AMP_OFFSET)
-
-        ################# TIME PROCESS #################
-        SAMPLE_RATE = device.query('SAMPLE_RATE?')
-        SAMPLE_RATE = float(SAMPLE_RATE[len('SARA '):-5])
-        Time_Interval_ms = 1 / SAMPLE_RATE * 1000
-
-        # get time interval, P143 in prog manual
-        Initial_Time_Value = TRIG_DELAY + (TIME_DIV * 14/2)
-
-        # build time axis array
-        TIME_AXIS = []
-        for i in range(len(VOLTAGE_RESULT)):
-            if i == 0:
-                TIME_AXIS.append(Initial_Time_Value)
-            elif i > 0:
-                TIME_AXIS.append(
-                    TIME_AXIS[0] + (Time_Interval_ms * Sparsing)*i)
-        TIME_AXIS = np.array(TIME_AXIS)
+    if (output.capturerawlength != 0):
+        ################# Process Waveform #################
+        VOLTAGE_RESULT = processBinaryData(
+            VOLTAGE_WAVEFORM, VOLT_DIV, VOLT_OFFSET)
+        CURRENT_RESULT = processBinaryData(
+            CURRENT_WAVEFORM, AMP_DIV, AMP_OFFSET)
+        TIME_AXIS = createTimeArray(
+            output.capturerawlength, TIME_DIV, TRIG_DELAY, Sparsing)
 
         # Trim to length of one cycle
         [idx_start, _] = findClosestValue(TIME_AXIS, 0)
-        [idx_end, _] = findClosestValue(
-            TIME_AXIS, (Initial_Time_Value + Time_Scale/1000))
+        [idx_end, _] = findClosestValue(TIME_AXIS, (Time_Scale/1000))
 
         TIME_AXIS = np.array(TIME_AXIS[idx_start:idx_end])
         VOLTAGE_RESULT = np.array(VOLTAGE_RESULT[idx_start:idx_end])
         CURRENT_RESULT = np.array(CURRENT_RESULT[idx_start:idx_end])
-        POWER_RESULT = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)[
-            idx_start:idx_end]
+        POWER_RESULT = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
 
-        output_raw = oscilloscoperawdata(
-            time_array=TIME_AXIS, voltage_array=VOLTAGE_RESULT, 
-            current_array=CURRENT_RESULT, power_array=POWER_RESULT)
+        output_raw = oscilloscoperawdata()
+        output_raw.time_array = TIME_AXIS
+        output_raw.voltage_array = VOLTAGE_RESULT
+        output_raw.current_array = CURRENT_RESULT
+        output_raw.power_array = POWER_RESULT
 
-        output.capturerawlength = len(VOLTAGE_WAVEFORM)
         output.capturetrimlength = len(output_raw.voltage_array)
-        output.errortime = abs(round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
+        output.errortime = abs(
+            round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
 
-        output.current_pk = round(float(np.percentile(output_raw.current_array, 95)), 2)
-        output.current_rms = round(np.sqrt(np.mean(np.square(output_raw.current_array))), 3)
-        output.current_av = round(float(np.average(np.absolute(output_raw.current_array))), 3)
+        output.current_pk = round(
+            float(np.percentile(output_raw.current_array, 95)), 2)
+        output.current_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.current_array))), 3)
+        output.current_av = round(
+            float(np.average(np.absolute(output_raw.current_array))), 3)
 
-        output.voltage_pk = round(float(np.percentile(output_raw.voltage_array, 95)), 2)
-        output.voltage_rms = round(np.sqrt(np.mean(np.square(output_raw.voltage_array))), 2)
-        output.voltage_av = round(float(np.average(np.absolute(output_raw.voltage_array))), 3)
+        output.voltage_pk = round(
+            float(np.percentile(output_raw.voltage_array, 95)), 2)
+        output.voltage_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.voltage_array))), 2)
+        output.voltage_av = round(
+            float(np.average(np.absolute(output_raw.voltage_array))), 3)
 
-        output.power_pk = round(float(np.percentile(output_raw.power_array, 95)), 2)
-        output.power_rms = round(np.sqrt(np.mean(np.square(output_raw.power_array))), 3)
+        output.power_pk = round(
+            float(np.percentile(output_raw.power_array, 95)), 2)
+        output.power_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.power_array))), 3)
         output.power_av = round(float(np.average(output_raw.power_array)*2), 2)
 
         output.capturetime = round(time.perf_counter() - start_time, 2)
