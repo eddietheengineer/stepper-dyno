@@ -23,7 +23,7 @@ SAMPLE_RATE = 0
 VOLT_OFFSET = 0
 AMP_OFFSET = 0
 INPUT_VOLT_OFFSET = 0
-INPUT_AMP_OFFSET = 0
+INPUT_AMP_OFFSET = -1
 SHARED_CHANNELS = 0
 
 
@@ -177,6 +177,7 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     global AMP_DIV
     global INPUT_VOLT_DIV
     global INPUT_AMP_DIV
+    global INPUT_VOLT_OFFSET
 
     # Output Volts -> mV -> 4 sections -> 200% of data
     VoltsPerDivision_V = math.ceil(inputVoltage/4*2)
@@ -192,28 +193,30 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
         print(f'AMP DIV Old:{AMP_DIV}, New:{AmpsPerDivision_A}')
         AMP_DIV = AmpsPerDivision_A
 
-    #INPUT_VOLTS
-    #Set Offset Equal to Input Voltage so trace is centered in display
-    VoltsOffset_inV = -int(inputVoltage)
-    #Set Scaling so that the display shows +/-50% of input voltage
-    VoltsPerDivision_inV = math.ceil(inputVoltage/2/4)
+    # INPUT_VOLTS
+    # Set Scaling so that the display shows +/-50% of input voltage
+    VoltsPerDivision_inV = math.ceil(inputVoltage*.20 / 8)
+    
+    # Set Offset Equal to Input Voltage so trace is centered in display
+    VoltsOffset_inV = -inputVoltage + VoltsPerDivision_inV
 
     if (VoltsPerDivision_inV != INPUT_VOLT_DIV) | (VoltsOffset_inV != INPUT_VOLT_OFFSET):
-        device.write(f'C{INPUT_VOLT_OFFSET}:OFFSET {VoltsOffset_inV}V')
-        device.write(f'C{INPUT_VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_inV}V')
+        device.write(f'C{INPUT_VOLTAGE_CHANNEL}:OFFSET {VoltsOffset_inV}V')
+        time.sleep(0.25)
+        device.write(f'C{INPUT_VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_inV*1000}mV')
         print(f'IN VOLT OFFSET Old:{INPUT_VOLT_OFFSET}, New:{VoltsOffset_inV}')
         print(f'IN VOLT DIV Old:{INPUT_VOLT_DIV}, New:{VoltsPerDivision_inV}')
         INPUT_VOLT_OFFSET = VoltsOffset_inV
         INPUT_VOLT_DIV = VoltsPerDivision_inV
 
-    # Input Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
-    AmpsPerDivision_inA = math.ceil(targetCurrentRms*10/4*1.4*1.5)/10
+    # INPUT AMPS
+    # Calculate peak amps
+    AmpsPerDivision_inA = math.ceil(targetCurrentRms*1.4*1.5/4)
+
     if (AmpsPerDivision_inA != INPUT_AMP_DIV):
         device.write(f'C{INPUT_CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_inA*1000}mV')
         print(f'IN AMP DIV Old:{INPUT_AMP_DIV}, New:{AmpsPerDivision_inA}')
         INPUT_AMP_DIV = AmpsPerDivision_inA
-
-
 
 
 def findFirstInstanceGreaterThan(array, value):

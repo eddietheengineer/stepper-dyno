@@ -18,12 +18,12 @@ step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
 
-speed_start = 20  # int(input('Start Speed: ') or 50)
+speed_start = 100  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 20  # int(input('Speed Step: ') or 50)
+speed_step = 100  # int(input('Speed Step: ') or 50)
 
-tmc_start = 1.4  # float(input('TMC Current Start: ') or 0.5)
-tmc_end = 1.4  # float(input('TMC Current End: ') or 1.0)
+tmc_start = 2.0  # float(input('TMC Current Start: ') or 0.5)
+tmc_end = 2.0  # float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.8  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
@@ -32,7 +32,7 @@ tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
 microstep_array = [16]
 
-voltage_start = 12
+voltage_start = 48
 voltage_end = 48
 voltage_step = 12
 
@@ -42,7 +42,7 @@ ACCELERATION = 10000
 SAMPLE_TARGET = 501000
 
 TIME_MOVE = 10
-CYCLES_MEASURED = 2
+CYCLES_MEASURED = 1
 NO_LOAD_TEST = False
 testcounter = 1
 failcount = 0
