@@ -9,15 +9,21 @@ from dataclasses import dataclass
 TOTAL_CHANNELS = 4
 CURRENT_CHANNEL = 2
 VOLTAGE_CHANNEL = 1
+INPUT_VOLTAGE_CHANNEL = 3
+INPUT_CURRENT_CHANNEL = 4
 
 # Oscilloscope Settings:
 TIME_DIV = 0
 TRIG_DELAY = 0
 VOLT_DIV = 0
 AMP_DIV = 0
+INPUT_VOLT_DIV = 0
+INPUT_AMP_DIV = 0
 SAMPLE_RATE = 0
 VOLT_OFFSET = 0
 AMP_OFFSET = 0
+INPUT_VOLT_OFFSET = 0
+INPUT_AMP_OFFSET = 0
 SHARED_CHANNELS = 0
 
 
@@ -64,7 +70,7 @@ def startChannels():
     global SHARED_CHANNELS
     channelStatus = [-1, -1, -1, -1]
     for i in range(1, TOTAL_CHANNELS+1):
-        if ((i == CURRENT_CHANNEL) | (i == VOLTAGE_CHANNEL)):
+        if ((i == CURRENT_CHANNEL) | (i == VOLTAGE_CHANNEL) | (i==INPUT_VOLTAGE_CHANNEL) | (i==INPUT_CURRENT_CHANNEL)):
             device.write(f'C{i}:TRACE ON')
             # print(f'{i} is ON')
             channelStatus[i-1] = 1
@@ -120,6 +126,24 @@ def setupScope():
     # Set Current Channel Vertical Offset to 0V
     device.write(f'C{CURRENT_CHANNEL}:OFFSET {AMP_OFFSET}V')
 
+    # Set Voltage Channel to Volts
+    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:UNIT V')
+    # Set Voltage Channel to 10X
+    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:ATTENUATION 10')
+    # Set Voltage Channel to DC Coupling
+    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:COUPLING D1M')
+    # Set Voltage Channel Vertical Offset to 0
+    device.write(f'C{INPUT_VOLTAGE_CHANNEL}:OFFSET {INPUT_VOLT_OFFSET}V')
+
+    # Set Current Channel to Amps
+    device.write(f'C{INPUT_CURRENT_CHANNEL}:UNIT A')
+    # Set Current Channel to 10X
+    device.write(f'C{INPUT_CURRENT_CHANNEL}:ATTENUATION 10')
+    # Set Current Channel to DC Coupling
+    device.write(f'C{INPUT_CURRENT_CHANNEL}:COUPLING D1M')
+    # Set Current Channel Vertical Offset to 0V
+    device.write(f'C{INPUT_CURRENT_CHANNEL}:OFFSET {INPUT_AMP_OFFSET}V')
+
     # Set Buzzer Off
     device.write('BUZZER OFF')
 
@@ -151,21 +175,45 @@ def configureScopeHorizontalAxis(CaptureTime_us):
 def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     global VOLT_DIV
     global AMP_DIV
+    global INPUT_VOLT_DIV
+    global INPUT_AMP_DIV
 
-    # Volts -> mV -> 4 sections -> 200% of data
+    # Output Volts -> mV -> 4 sections -> 200% of data
     VoltsPerDivision_V = math.ceil(inputVoltage/4*2)
     if (VoltsPerDivision_V != VOLT_DIV):
         device.write(f'C{VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_V}V')
-        print(
-            f'      Updated VOLT DIV Old:{VOLT_DIV}, New:{VoltsPerDivision_V}')
+        print(f'VOLT DIV Old:{VOLT_DIV}, New:{VoltsPerDivision_V}')
         VOLT_DIV = VoltsPerDivision_V
 
-    # Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
+    # Output Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
     AmpsPerDivision_A = math.ceil(targetCurrentRms*10/4*1.4*1.5)/10
     if (AmpsPerDivision_A != AMP_DIV):
         device.write(f'C{CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_A*1000}mV')
-        print(f'      Updated AMP DIV Old:{AMP_DIV}, New:{AmpsPerDivision_A}')
+        print(f'AMP DIV Old:{AMP_DIV}, New:{AmpsPerDivision_A}')
         AMP_DIV = AmpsPerDivision_A
+
+    #INPUT_VOLTS
+    #Set Offset Equal to Input Voltage so trace is centered in display
+    VoltsOffset_inV = -int(inputVoltage)
+    #Set Scaling so that the display shows +/-50% of input voltage
+    VoltsPerDivision_inV = math.ceil(inputVoltage/2/4)
+
+    if (VoltsPerDivision_inV != INPUT_VOLT_DIV) | (VoltsOffset_inV != INPUT_VOLT_OFFSET):
+        device.write(f'C{INPUT_VOLT_OFFSET}:OFFSET {VoltsOffset_inV}V')
+        device.write(f'C{INPUT_VOLTAGE_CHANNEL}:VOLT_DIV {VoltsPerDivision_inV}V')
+        print(f'IN VOLT OFFSET Old:{INPUT_VOLT_OFFSET}, New:{VoltsOffset_inV}')
+        print(f'IN VOLT DIV Old:{INPUT_VOLT_DIV}, New:{VoltsPerDivision_inV}')
+        INPUT_VOLT_OFFSET = VoltsOffset_inV
+        INPUT_VOLT_DIV = VoltsPerDivision_inV
+
+    # Input Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
+    AmpsPerDivision_inA = math.ceil(targetCurrentRms*10/4*1.4*1.5)/10
+    if (AmpsPerDivision_inA != INPUT_AMP_DIV):
+        device.write(f'C{INPUT_CURRENT_CHANNEL}:VOLT_DIV {AmpsPerDivision_inA*1000}mV')
+        print(f'IN AMP DIV Old:{INPUT_AMP_DIV}, New:{AmpsPerDivision_inA}')
+        INPUT_AMP_DIV = AmpsPerDivision_inA
+
+
 
 
 def findFirstInstanceGreaterThan(array, value):
