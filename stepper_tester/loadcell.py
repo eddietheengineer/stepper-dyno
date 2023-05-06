@@ -5,13 +5,15 @@ from hx711 import HX711
 import numpy as np
 from dataclasses import dataclass
 
+
 @dataclass
 class loadcelldata:
-    grams: float
-    torque: float
-    motorpower: float
-    capturetime: float
-    samples: int
+    grams: float = 0
+    torque: float = 0
+    motorpower: float = 0
+    capturetime: float = 0
+    samples: int = 0
+
 
 referenceunit = 1085
 samplecount = 5
@@ -19,6 +21,7 @@ samplecount = 5
 hx = HX711(5, 6)
 hx.set_reading_format("MSB", "MSB")
 hx.set_reference_unit(referenceunit)
+
 
 def close():
     print("      Cleaning Loadcell")
@@ -40,13 +43,13 @@ def measure(sampleCount, speed):
         time.sleep(0.1)
     filtered_data = reject_range_outliers(np.array(measurements))
 
-    loadcelldata.grams = max(np.average(filtered_data),0)
-
-    loadcelldata.torque = loadcelldata.grams / 1000 * 9.81 * 135 / 10
-    loadcelldata.motorpower = loadcelldata.torque / 100 * speed * 2 * 3.1415/40
-    loadcelldata.capturetime = round(time.perf_counter()-start,2)
-    loadcelldata.samples = len(filtered_data)
-    return loadcelldata
+    summary = loadcelldata()
+    summary.grams = max(np.average(filtered_data), 0)
+    summary.torque = summary.grams / 1000 * 9.81 * 135 / 10
+    summary.motorpower = summary.torque / 100 * speed * 2 * 3.1415/40
+    summary.capturetime = round(time.perf_counter()-start, 2)
+    summary.samples = len(filtered_data)
+    return summary
 
 
 def reject_range_outliers(data, allowedrange=0.5):

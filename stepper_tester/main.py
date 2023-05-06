@@ -13,7 +13,7 @@ from dataclasses import dataclass, fields
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.5.2023a'
+test_id = '5.5.2023b'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -159,7 +159,6 @@ def main():
 
                     # Process Load Cell Data
                     loadcelldata = f3.result()
-
                     mech_data_label = tuple(field.name for field in fields(loadcelldata))
                     mech_data = (round(loadcelldata.grams, 3), round(loadcelldata.torque, 3), round(
                         loadcelldata.motorpower, 3), loadcelldata.samples)

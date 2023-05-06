@@ -5,12 +5,15 @@ from dataclasses import dataclass
 
 riden = Riden(port="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
               baudrate=115200, address=1)
+
+
 @dataclass
 class powersupplydata:
-    measuredvoltage: float
-    measuredpower: float
-    samplecount: int
-    capturetime: float
+    measuredvoltage: float = 0
+    measuredpower: float = 0
+    samplecount: int = 0
+    capturetime: float = 0
+
 
 def measure(sampleCount):
     start = time.perf_counter()
@@ -20,11 +23,13 @@ def measure(sampleCount):
         measurements_power.append(val)
         time.sleep(0.1)
     filtered_data = reject_range_outliers(np.array(measurements_power))
-    powersupplydata.measuredpower = round(np.average(filtered_data), 2)
-    powersupplydata.capturetime = round(time.perf_counter() - start, 2)
-    powersupplydata.samplecount = len(filtered_data)
-    powersupplydata.measuredvoltage = riden.get_v_out()
-    return powersupplydata
+    output = powersupplydata()
+    output.measuredpower = round(np.average(filtered_data), 2)
+    output.capturetime = round(time.perf_counter() - start, 2)
+    output.samplecount = len(filtered_data)
+    output.measuredvoltage = riden.get_v_out()
+    return output
+
 
 def reject_range_outliers(data, allowedrange=0.2):
     d = np.abs(data - np.median(data))
