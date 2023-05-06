@@ -8,12 +8,12 @@ import concurrent.futures
 import csv_logger
 import sys
 import change_config
-#import plotting
+# import plotting
 from dataclasses import dataclass, fields
 
 # str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.5.23c'
+test_id = '5.6.23a'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -51,13 +51,14 @@ cycle_time = 0
 
 @dataclass
 class TestIdData():
-    stepper_model: str
-    test_id: str
-    test_counter: int
-    test_voltage: int
-    test_microstep: int
-    test_current: float
-    test_speed: int
+    stepper_model: str = 'LDO_42STH48-2504AC'
+    phase_resistance: float = 1.5
+    test_id: str = '5.6.23a'
+    test_counter: int = 0
+    test_voltage: int = 0
+    test_microstep: int = 0
+    test_current: float = 0
+    test_speed: int = 0
 
 
 @dataclass
@@ -78,6 +79,7 @@ class IterativeData():
     microstep_setting: int
     current_setting: float
     speed_setting: int
+
 
 def main():
 
@@ -115,8 +117,11 @@ def main():
                     global cycle_time
                     global reset_counter
 
+                    output = TestIdData(
+                        test_counter=testcounter, test_voltage=voltage_setting, test_microstep=microstep, test_current=tmc_current, test_speed=speed)
+
                     # If previous peak current was < tmc_current*1.4, change to
-                    if (previous_peak_current < tmc_current * 1.4 * .5):
+                    if (previous_peak_current < tmc_current * 1.4 * .5) & (previous_peak_current > 0.1):
                         scope_capture.configureScopeVerticalAxis(
                             voltage_setting, previous_peak_current/1.414)
 
@@ -159,22 +164,25 @@ def main():
 
                     # Process Load Cell Data
                     loadcelldata = f3.result()
-                    mech_data_label = tuple(field.name for field in fields(loadcelldata))
+                    mech_data_label = tuple(
+                        field.name for field in fields(loadcelldata))
                     mech_data = (round(loadcelldata.grams, 3), round(loadcelldata.torque, 3), round(
                         loadcelldata.motorpower, 3), loadcelldata.samples)
 
                     # Process Power Supply Data
                     powersupplydata = f2.result()
-                    powersupply_data_label = tuple(field.name for field in fields(powersupplydata))
+                    powersupply_data_label = tuple(
+                        field.name for field in fields(powersupplydata))
                     powersupply_data = (
                         powersupplydata.measuredvoltage, powersupplydata.measuredpower)
 
                     # Process Oscilloscope Data
                     oscilloscopedata, oscilloscoperawdata = f1.result()
-                    #oscilloscope_data_label1 = tuple(field.name for field in fields(oscilloscopedata))[4:]
+                    # oscilloscope_data_label1 = tuple(field.name for field in fields(oscilloscopedata))[4:]
                     oscilloscope_data_label = (
                         'voltage_rms', 'current_pkpk', 'current_rms',  'current_average', 'power_average', 'power_max')
-                    oscilloscope_data = (oscilloscopedata.voltage_rms, oscilloscopedata.current_pk, oscilloscopedata.current_rms, oscilloscopedata.current_av, oscilloscopedata.power_av, oscilloscopedata.power_pk)
+                    oscilloscope_data = (oscilloscopedata.voltage_rms, oscilloscopedata.current_pk, oscilloscopedata.current_rms,
+                                         oscilloscopedata.current_av, oscilloscopedata.power_av, oscilloscopedata.power_pk)
 
                     oscilloscope_reference_label = (
                         'sparsing', 'orig_samples', 'trim_samples', 'error_delta', 'errors')
@@ -189,7 +197,7 @@ def main():
                         temperaturedata.rpitemp, temperaturedata.drivertemp, temperaturedata.steppertemp)
 
                     # Check if oscilloscope actually captured data
-                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime,1) < 5)):
+                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime, 1) < 5)):
 
                         # Check if motor has stalled
                         if (loadcelldata.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):
@@ -286,12 +294,18 @@ def calculatepower(testdata, loadcell, powersupply, oscilloscope):
 
     PowerSummary.driverpower_in = powersupply.measuredpower
     PowerSummary.driverpower_out = oscilloscope.power_av
-    PowerSummary.driverpower_loss = PowerSummary.driverpower_in - PowerSummary.driverpower_out
+    PowerSummary.driverpower_loss = PowerSummary.driverpower_in - \
+        PowerSummary.driverpower_out
 
-    PowerSummary.motorpower_totalloss = PowerSummary.driverpower_out - PowerSummary.motorpower_output
-    PowerSummary.motorpower_copperloss = 2 * oscilloscope.current_av**2 * motor_resistance
-    PowerSummary.motorpower_ironloss = testdata.speed * oscilloscope.current_pk * iron_constant
-    PowerSummary.motorpower_miscerror = PowerSummary.motorpower_totalloss - PowerSummary.motorpower_copperloss - PowerSummary.motorpower_ironloss
+    PowerSummary.motorpower_totalloss = PowerSummary.driverpower_out - \
+        PowerSummary.motorpower_output
+    PowerSummary.motorpower_copperloss = 2 * \
+        oscilloscope.current_av**2 * motor_resistance
+    PowerSummary.motorpower_ironloss = testdata.speed * \
+        oscilloscope.current_pk * iron_constant
+    PowerSummary.motorpower_miscerror = PowerSummary.motorpower_totalloss - \
+        PowerSummary.motorpower_copperloss - PowerSummary.motorpower_ironloss
+
 
 if __name__ == "__main__":
 
