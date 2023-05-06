@@ -3,6 +3,17 @@ import time
 import RPi.GPIO as GPIO
 from hx711 import HX711
 import numpy as np
+from dataclasses import dataclass
+
+
+@dataclass
+class loadcelldata:
+    grams: float = 0
+    torque: float = 0
+    motorpower: float = 0
+    capturetime: float = 0
+    samples: int = 0
+
 
 referenceunit = 1085
 samplecount = 5
@@ -10,6 +21,7 @@ samplecount = 5
 hx = HX711(5, 6)
 hx.set_reading_format("MSB", "MSB")
 hx.set_reference_unit(referenceunit)
+
 
 def close():
     print("      Cleaning Loadcell")
@@ -22,21 +34,7 @@ def tare():
     print("      Tared Loadcell")
 
 
-def summary(speed, sampleCount):
-    # Process Load Cell Data
-    [grams, _, lc_samples] = measure(sampleCount)
-    if grams < 0:
-        grams = 0
-    torque = grams / 1000 * 9.81 * 135 / 10
-    motor_power = torque / 100 * speed * 2 * 3.1415/40
-    mech_data_label = ('grams', 'torque',
-                       'motor_power', 'lc_samples')
-    mech_data = (round(grams, 3), round(torque, 3),
-                 round(motor_power, 3), lc_samples)
-    return mech_data_label, mech_data
-
-
-def measure(sampleCount):
+def measure(sampleCount, speed):
     start = time.perf_counter()
     measurements = []
     for _ in range(sampleCount):
@@ -44,10 +42,14 @@ def measure(sampleCount):
         measurements.append(val)
         time.sleep(0.1)
     filtered_data = reject_range_outliers(np.array(measurements))
-    average = np.average(filtered_data)
-    loadcelltime = time.perf_counter()-start
-    samples = len(filtered_data)
-    return average, loadcelltime, samples
+
+    summary = loadcelldata()
+    summary.grams = max(np.average(filtered_data), 0)
+    summary.torque = summary.grams / 1000 * 9.81 * 135 / 10
+    summary.motorpower = summary.torque / 100 * speed * 2 * 3.1415/40
+    summary.capturetime = round(time.perf_counter()-start, 2)
+    summary.samples = len(filtered_data)
+    return summary
 
 
 def reject_range_outliers(data, allowedrange=0.5):

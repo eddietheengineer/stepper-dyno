@@ -1,8 +1,17 @@
-#Klipper Serial Communicator
+# Klipper Serial Communicator
 import serial
 import io
 import string
 import re
+from dataclasses import dataclass
+
+
+@dataclass
+class temperaturedata:
+    rpitemp: float = 0
+    drivertemp: float = 0
+    steppertemp: float = 0
+
 
 def restart():
     ser = serial.Serial(
@@ -45,4 +54,8 @@ def readtemp():
     temps = [re.findall("\d+\.\d+", value)[0]
              for value in temps_split if value[0] in string.ascii_uppercase]
     ser.close()
-    return tuple(temps)
+    output = temperaturedata()
+    output.rpitemp = float(temps[0])
+    output.drivertemp = float(temps[1])
+    output.steppertemp = float(temps[2])
+    return output
