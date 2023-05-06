@@ -39,7 +39,7 @@ voltage_step = 12
 reset_counter = 1
 
 ACCELERATION = 10000
-SAMPLE_TARGET = 501000
+SAMPLE_TARGET = 101000
 
 TIME_MOVE = 10
 CYCLES_MEASURED = 1
@@ -97,7 +97,7 @@ def main():
             change_config.updateMS(microstep)
             klipper_serial.restart()
             print('      Starting Sleep Time - 10 seconds')
-            time.sleep(10)
+            time.sleep(15)
 
             for tmc_currentx10 in range(int(tmc_start*10), int(tmc_end*10)+int(tmc_step*10), int(tmc_step*10)):
 
