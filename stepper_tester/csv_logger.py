@@ -1,59 +1,50 @@
 import os
 import numpy as np
 import pandas as pd
-from dataclass_csv import DataclassWriter
+from dataclasses import fields
 
-def writeheader(model_number, test_id, label):
+
+def writeheader(model_number, test_id, header):
     filepath = f'/home/pi/Desktop/{model_number}_{test_id}/'
-    csvfilepath = f'/home/pi/Desktop/{model_number}_{test_id}/{model_number}_Summary.csv'
+    filename = f'{model_number}_{test_id}_Summary.csv'
 
     if not os.path.exists(filepath):
         os.makedirs(filepath)
 
-    with open(csvfilepath, "w+", encoding='UTF-8') as file:
-        if os.stat(csvfilepath).st_size == 0:
-            file.write(str(label)[1:-1]+'\n')
+    with open(f'{filepath}{filename}', "w+", encoding='UTF-8') as file:
+        if os.stat(f'{filepath}{filename}').st_size == 0:
+            file.write(str(header)[1:-1]+'\n')
     file.close()
 
 
 def writedata(model_number, test_id, data):
-    csvfilepath = f'/home/pi/Desktop/{model_number}_{test_id}/{model_number}_Summary.csv'
-    with open(csvfilepath, "a", encoding='UTF-8') as file:
+    filepath = f'/home/pi/Desktop/{model_number}_{test_id}/'
+    filename = f'{model_number}_{test_id}_Summary.csv'
+    with open(f'{filepath}{filename}', "a", encoding='UTF-8') as file:
         file.write(str(data)[1:-1]+'\n')
     file.close()
 
-# def writedataclass(testid):
-#     filepath = f'/home/pi/Desktop/{testid.stepper_model}_{testid.test_id}/'
-#     csvfilepath = f'/{testid.stepper_model}_{testid.test_id}_Summary.csv'
 
-#     if not os.path.exists(filepath):
-#         os.makedirs(filepath)
+def writeoscilloscopedata(testiddata, raw):
 
-#     with open(csvfilepath, "w+", encoding='UTF-8') as file:
-#         w = DataclassWriter(file, testdata, TestPointData)
-#         w.write()
-
-
-def writeoscilloscopedata(output_data, index_data, oscilloscope_data):
-
-    Model_Number = output_data[index_data.index('model_number')]
-    Test_ID = output_data[index_data.index('test_id')]
-    Test_Number = output_data[index_data.index('test_counter')]
-    Voltage = output_data[index_data.index('voltage_setting')]
-    Microstep = output_data[index_data.index('microstep')]
-    Current = output_data[index_data.index('tmc_current')]
-    Speed = output_data[index_data.index('speed')]
+    Model_Number = testiddata.stepper_model
+    Test_ID = testiddata.test_id
+    Test_Number = testiddata.test_counter
+    Voltage = testiddata.test_voltage
+    Microstep = testiddata.test_microstep
+    Current = testiddata.test_current
+    Speed = testiddata.test_speed
 
     filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Data/'
 
     if not os.path.exists(filepath):
         os.makedirs(filepath)
 
-    csvfilepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Data/{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}V_{Microstep}ms_{Current}A_{Speed}mms.zip'
-    oscilloscope_data_transposed = np.transpose(oscilloscope_data)
+    filename = f'{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}V_{Microstep}ms_{Current}A_{Speed}mms'
 
-    DF = pd.DataFrame(oscilloscope_data_transposed, columns=[
-                      'Time (ms)', 'Voltage (V)', 'Current (A)', 'Power (W)'])
-    DF.round({'Time (ms)': 8, 'Voltage (V)': 4,
-             'Current (A)': 4, 'Power (W)': 4})
-    DF.to_csv(csvfilepath, compression="zip")
+    header = tuple(field.name for field in fields(raw))
+    array = np.transpose(np.stack((raw.time_array, raw.voltin_array, raw.ampin_array,
+                         raw.powerin_array, raw.voltout_array, raw.ampout_array, raw.powerout_array), axis=0))
+
+    DF = pd.DataFrame(data=array, columns=header)
+    DF.to_parquet(f'/{filepath}{filename}.parquet')

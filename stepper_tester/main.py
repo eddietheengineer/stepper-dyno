@@ -13,7 +13,7 @@ import change_config
 from dataclasses import dataclass, fields
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.6.23'
+test_id = '5.7.23a'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -36,7 +36,7 @@ voltage_array = [24, 48]
 reset_counter = 1
 
 ACCELERATION = 10000
-SAMPLE_TARGET = 501000
+SAMPLE_TARGET = 500100
 
 TIME_MOVE = 10
 CYCLES_MEASURED = 1
@@ -48,8 +48,8 @@ cycle_time = 0
 
 @dataclass
 class TestIdData():
-    stepper_model: str = 'LDO_42STH48-2504AC'
-    test_id: str = '5.6.23a'
+    stepper_model: str = model_number
+    test_id: str = test_id
     test_counter: int = 0
     test_voltage: int = 0
     test_microstep: int = 0
@@ -196,15 +196,11 @@ def main():
                             failcount = 0
                             break
 
-                        # if (failcount == 0):
-                        #     # Plot Oscilloscope Data if motor hasn't stalled
-                        #     plotting.plotosData(output_data, output_data_label, oscilloscopedata.oscilloscope_time_array, oscilloscopedata.oscilloscope_voltage_array,
-                        #                         oscilloscopedata.oscilloscope_current_array, oscilloscopedata.oscilloscope_power_array)
-                        #     csv_logger.writeoscilloscopedata(output_data, output_data_label, np.stack(
-                        #         oscilloscopedata.oscilloscope_time_array,
-                        #         oscilloscopedata.oscilloscope_voltage_array,
-                        #         oscilloscopedata.oscilloscope_current_array,
-                        #         oscilloscopedata.oscilloscope_power_array), axis=0)
+                        if (failcount == 0):
+                            # Plot Oscilloscope Data if motor hasn't stalled
+                            #plotting.plotosData(output_data, output_data_label, oscilloscopedata.oscilloscope_time_array, oscilloscopedata.oscilloscope_voltage_array,
+                            #                    oscilloscopedata.oscilloscope_current_array, oscilloscopedata.oscilloscope_power_array)
+                            csv_logger.writeoscilloscopedata(testid, scoperaw)
 
                         # Process Cycle Data
                         cycle_time = (time.perf_counter() - start_time)
@@ -235,7 +231,7 @@ def main():
 
                         # End Speed Iteration
                         speed += speed_step
-                        previous_peak_current = scope.current_pk
+                        previous_peak_current = scope.ampout_pk
                         testcounter += 1
 
                     else:

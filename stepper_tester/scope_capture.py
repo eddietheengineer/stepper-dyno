@@ -36,21 +36,24 @@ class oscilloscopedata:
     capturerawlength: int = 0
     capturetrimlength: int = 0
     sparsing: int = 0
-    current_av: float = 0
-    current_rms: float = 0
-    current_pk: float = 0
-    voltage_av: float = 0
-    voltage_rms: float = 0
-    voltage_pk: float = 0
-    power_av: float = 0
-    power_rms: float = 0
-    power_pk: float = 0
+    ampout_av: float = 0
+    ampout_rms: float = 0
+    ampout_pk: float = 0
+    voltout_av: float = 0
+    voltout_rms: float = 0
+    voltout_pk: float = 0
+    powerout_av: float = 0
+    powerout_rms: float = 0
+    powerout_pk: float = 0
     voltin_av: float = 0
     voltin_rms: float = 0
     voltin_pk: float = 0
     ampin_av: float = 0
     ampin_rms: float = 0
     ampin_pk: float = 0
+    powerin_av: float = 0
+    powerin_rms: float = 0
+    powerin_pk: float = 0
 
 @dataclass
 class recordsummary:
@@ -62,11 +65,14 @@ class recordsummary:
 @dataclass
 class oscilloscoperawdata:
     time_array: np.ndarray = np.array([])
-    voltage_array: np.ndarray = np.array([])
-    current_array: np.ndarray = np.array([])
-    power_array: np.ndarray = np.array([])
     voltin_array: np.ndarray = np.array([])
     ampin_array: np.ndarray = np.array([])
+    powerin_array: np.ndarray = np.array([])
+    voltout_array: np.ndarray = np.array([])
+    ampout_array: np.ndarray = np.array([])
+    powerout_array: np.ndarray = np.array([])
+
+
 
 
 TIME_INFO = timeconfiguration()
@@ -166,38 +172,40 @@ def captureAllSingle(Samples, Time_Scale):
         VOLT_IN_RESULT = np.array(VOLT_IN_RESULT[idx_start:idx_end])
         AMP_IN_RESULT = np.array(AMP_IN_RESULT[idx_start:idx_end])
         POWER_RESULT = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
+        POWER_IN_RESULT = np.multiply(VOLT_IN_RESULT, AMP_IN_RESULT)
 
         output_raw = oscilloscoperawdata()
         output_raw.time_array = TIME_AXIS
-        output_raw.voltage_array = VOLTAGE_RESULT
-        output_raw.current_array = CURRENT_RESULT
-        output_raw.power_array = POWER_RESULT
+        output_raw.voltout_array = VOLTAGE_RESULT
+        output_raw.ampout_array = CURRENT_RESULT
+        output_raw.powerout_array = POWER_RESULT
         output_raw.voltin_array = VOLT_IN_RESULT
         output_raw.ampin_array = AMP_IN_RESULT
+        output_raw.powerin_array = POWER_IN_RESULT
 
-        output.capturetrimlength = len(output_raw.voltage_array)
+        output.capturetrimlength = len(output_raw.voltin_array)
         output.errorpct = abs(
             round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
 
-        output.current_pk = round(
-            float(np.percentile(output_raw.current_array, 95)), 2)
-        output.current_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.current_array))), 3)
-        output.current_av = round(
-            float(np.average(np.absolute(output_raw.current_array))), 3)
+        output.ampout_pk = round(
+            float(np.percentile(output_raw.ampout_array, 95)), 2)
+        output.ampout_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.ampout_array))), 3)
+        output.ampout_av = round(
+            float(np.average(np.absolute(output_raw.ampout_array))), 3)
 
-        output.voltage_pk = round(
-            float(np.percentile(output_raw.voltage_array, 95)), 2)
-        output.voltage_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.voltage_array))), 2)
-        output.voltage_av = round(
-            float(np.average(np.absolute(output_raw.voltage_array))), 3)
+        output.voltout_pk = round(
+            float(np.percentile(output_raw.voltout_array, 95)), 2)
+        output.voltout_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.voltout_array))), 2)
+        output.voltout_av = round(
+            float(np.average(np.absolute(output_raw.voltout_array))), 3)
 
-        output.power_pk = round(
-            float(np.percentile(output_raw.power_array, 95)), 2)
-        output.power_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.power_array))), 3)
-        output.power_av = round(float(np.average(output_raw.power_array)*2), 2)
+        output.powerout_pk = round(
+            float(np.percentile(output_raw.powerout_array, 95)), 2)
+        output.powerout_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.powerout_array))), 3)
+        output.powerout_av = round(float(np.average(output_raw.powerout_array)*2), 2)
 
         output.voltin_pk = round(
             float(np.percentile(output_raw.voltin_array, 95)), 2)
