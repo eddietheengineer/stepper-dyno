@@ -13,16 +13,16 @@ import plotting
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.7.23e'
+test_id = '5.7.23'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
 
-speed_start = 100  # int(input('Start Speed: ') or 50)
-speed_end = 1000  # int(input('Ending Speed: ') or 300)
-speed_step = 100  # int(input('Speed Step: ') or 50)
+speed_start = 20  # int(input('Start Speed: ') or 50)
+speed_end = 3000  # int(input('Ending Speed: ') or 300)
+speed_step = 20  # int(input('Speed Step: ') or 50)
 
-tmc_start = 2.0  # float(input('TMC Current Start: ') or 0.5)
+tmc_start = 1.0  # float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.0  # float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.5  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
