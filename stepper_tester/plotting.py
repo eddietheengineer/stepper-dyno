@@ -3,41 +3,48 @@ import os
 import time
 
 
-def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
+def plotosData(alldata, array, type):
     start_time = time.perf_counter()
-    Model_Number = output_data[index_data.index('model_number')]
-    Test_ID = output_data[index_data.index('test_id')]
-    Test_Number = output_data[index_data.index('test_counter')]
-    Voltage = output_data[index_data.index('voltage_setting')]
-    Microstep = output_data[index_data.index('microstep')]
-    Current = output_data[index_data.index('tmc_current')]
-    Speed = output_data[index_data.index('speed')]
+    Model_Number = alldata.id.stepper_model
+    Test_ID = alldata.id.test_id
+    Test_Number = alldata.id.test_counter
+    Voltage = alldata.id.test_voltage
+    Microstep = alldata.id.test_microstep
+    Current = alldata.id.test_current
+    Speed = alldata.id.test_speed
 
-    Power = output_data[index_data.index('p_supply')]
-    Current_RMS = output_data[index_data.index('current_rms')]
-    Current_PkPk = output_data[index_data.index('current_pkpk')]
-    Torque = output_data[index_data.index('torque')]
+    Power = alldata.psu.measuredpower
+    Current_RMS = alldata.scope.ampout_rms
+    Torque = alldata.mech.torque
 
     Top_Line = f'Model: {Model_Number} Test ID: {Test_ID} Test Number: {Test_Number}'
     Middle_Line = f'Voltage: {Voltage} V, Microstep: {Microstep}, Current: {Current} A, Speed: {Speed} mm/s'
-    Bottom_Line = f'Power: {Power:0.1f}, Current (RMS): {Current_RMS:0.2f}, Current (Peak): {Current_PkPk:0.2f}, Torque: {Torque:0.1f}'
+    #Bottom_Line = f'Power: {Power:0.1f}, Current (RMS): {Current_RMS:0.2f}, Torque: {Torque:0.1f}'
 
     plotter.rcParams['figure.figsize'] = [8, 4.5]
     fig, ax1 = plotter.subplots()
     ax2 = ax1.twinx()
     ax3 = ax1.twinx()
-    ax1.plot(TIME_AXIS, RESULT1, linewidth=0.5, label="Voltage")
-    ax2.plot(TIME_AXIS, RESULT2, linewidth=0.5,
-             label="Current", color="orange")
-    ax3.plot(TIME_AXIS, RESULT3, linewidth=0.5, label="Power", color="red")
+    if (type == 'Out'):
+        ax1.plot(array.time_array, array.voltout_array, linewidth=0.5, label="Voltage")
+        ax2.plot(array.time_array, array.ampout_array, linewidth=0.5, label="Current", color="orange")
+        ax3.plot(array.time_array, array.powerout_array, linewidth=0.5, label="Power", color="red")
+        ax1.set_ylim(-80, 80)
+        ax2.set_ylim(-4, 4)
+        ax3.set_ylim(-160, 160)
+    elif (type == 'In'):
+        ax1.plot(array.time_array, array.voltin_array, linewidth=0.5, label="Voltage")
+        ax2.plot(array.time_array, array.ampin_array, linewidth=0.5, label="Current", color="orange")
+        ax3.plot(array.time_array, array.powerin_array, linewidth=0.5, label="Power", color="red")
+        ax1.set_ylim(Voltage*.7, Voltage*1.05)
+        ax2.set_ylim(-5, 5)
+        ax3.set_ylim(-150, 300)
     plotter.title(f'{Top_Line} \n {Middle_Line}')
     ax1.set_xlabel("Time (ms)")
     ax1.set_ylabel("Volts")
-    ax1.set_ylim(-80, 80)
+
     ax2.set_ylabel("Amps")
-    ax2.set_ylim(-4, 4)
     ax3.set_ylabel("Power")
-    ax3.set_ylim(-160, 160)
 
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
@@ -47,14 +54,13 @@ def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
     plotter.margins(0)
     plotter.grid(visible=True)
 
-    filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Plots/'
+    filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Plots_{type}/'
+
     if not os.path.exists(filepath):
         os.makedirs(filepath)
 
-    filename = str(Model_Number) + "_" + str(Test_ID) + "/Oscilloscope_Plots/" + str(Model_Number) + "_" + \
-        str(Test_ID) + "_" + str(Test_Number)+"_"+str(Voltage) + \
-        "_"+str(Microstep)+"_"+str(Current)+"_"+str(Speed)
-    plotter.savefig(f'/home/pi/Desktop/{filename}.png', dpi=240)
+    filename = f'{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}_{Microstep}_{Current}_{Speed}'
+    plotter.savefig(f'{filepath}{filename}.png', dpi=240)
     plotter.clf()
     plotter.close()
     plot_time = time.perf_counter() - start_time
