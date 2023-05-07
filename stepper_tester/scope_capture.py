@@ -40,7 +40,8 @@ class oscilloscopedata:
     ampin_min: float = 0
     powerin_av: float = 0
     powerin_rms: float = 0
-    powerin_pk: float = 0
+    powerin_max: float = 0
+    powerin_min: float = 0
     voltout_av: float = 0
     voltout_rms: float = 0
     voltout_pk: float = 0
@@ -57,12 +58,14 @@ class oscilloscopedata:
     capturetrimlength: int = 0
     sparsing: int = 0
 
+
 @dataclass
 class recordsummary:
     average: float = 0
     rms: float = 0
     max: float = 0
     min: float = 0
+
 
 @dataclass
 class oscilloscoperawdata:
@@ -77,8 +80,10 @@ class oscilloscoperawdata:
 
 TIME_INFO = timeconfiguration()
 CHANNEL_LIST = [channelconfiguration(id=1, enabled=True, name='VOLT_OUT', attn=10, unit='V'),
-                channelconfiguration(id=2, enabled=True, name='AMP_OUT', attn=10, unit='A'),
-                channelconfiguration(id=3, enabled=True, name='VOLT_IN', attn=10, unit='V'),
+                channelconfiguration(id=2, enabled=True,
+                                     name='AMP_OUT', attn=10, unit='A'),
+                channelconfiguration(id=3, enabled=True,
+                                     name='VOLT_IN', attn=10, unit='V'),
                 channelconfiguration(id=4, enabled=True, name='AMP_IN', attn=10, unit='A', offset=-1)]
 
 
@@ -110,7 +115,7 @@ def setupScope():
     # Set Buzzer Off
     device.write('BUZZER OFF')
 
-    setTrigger(CHANNEL_LIST[1].id, 100)
+    setTrigger(CHANNEL_LIST[1].id, 200)
 
     for i in range(len(CHANNEL_LIST)):
         if CHANNEL_LIST[i].enabled is True:
@@ -126,7 +131,8 @@ def captureAllSingle(Samples, Time_Scale):
     TIME_INFO.sparsing = setSparsing(Samples, Time_Scale)
 
     # Setup waveform capture
-    device.write(str.format(f'WAVEFORM_SETUP SP,{TIME_INFO.sparsing},NP,{Samples},FP,0'))
+    device.write(str.format(
+        f'WAVEFORM_SETUP SP,{TIME_INFO.sparsing},NP,{Samples},FP,0'))
     # Start Capture
     time.sleep(1)
     device.write('ARM')
@@ -152,7 +158,7 @@ def captureAllSingle(Samples, Time_Scale):
         ################# Process Waveform #################
         TIME_AXIS = createTimeArray(
             output.capturerawlength, TIME_INFO.div, TIME_INFO.delay, TIME_INFO.sparsing)
-        
+
         # Trim to length of one cycle
         [idx_start, _] = findClosestValue(TIME_AXIS, 0)
         [idx_end, _] = findClosestValue(TIME_AXIS, (Time_Scale/1000))
@@ -170,7 +176,7 @@ def captureAllSingle(Samples, Time_Scale):
         VOLTAGE_RESULT = np.array(VOLTAGE_RESULT[idx_start:idx_end])
         CURRENT_RESULT = np.array(CURRENT_RESULT[idx_start:idx_end])
         VOLT_IN_RESULT = np.array(VOLT_IN_RESULT[idx_start:idx_end])
-        AMP_IN_RESULT = np.array(AMP_IN_RESULT[idx_start:idx_end])
+        AMP_IN_RESULT = np.array(AMP_IN_RESULT[idx_start:idx_end])*10
         POWER_RESULT = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
         POWER_IN_RESULT = np.multiply(VOLT_IN_RESULT, AMP_IN_RESULT)
 
@@ -187,12 +193,27 @@ def captureAllSingle(Samples, Time_Scale):
         output.errorpct = abs(
             round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
 
-        output.ampout_pk = round(
-            float(np.percentile(output_raw.ampout_array, 99)), 2)
-        output.ampout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.ampout_array))), 3)
-        output.ampout_av = round(
-            float(np.average(np.absolute(output_raw.ampout_array))), 3)
+        output.voltin_max = round(
+            float(np.percentile(output_raw.voltin_array, 99)), 2)
+        output.voltin_min = round(
+            float(np.percentile(output_raw.voltin_array, 1)), 2)
+        output.voltin_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.voltin_array))), 3)
+        output.voltin_av = round(float(np.average(output_raw.voltin_array)), 3)
+
+        output.ampin_max = round(
+            float(np.percentile(output_raw.ampin_array, 99)), 3)
+        output.ampin_min = round(
+            float(np.percentile(output_raw.ampin_array, 1)), 3)
+        output.ampin_av = round(
+            float(np.average(output_raw.ampin_array)), 3)
+
+        output.powerin_max = round(
+            float(np.percentile(output_raw.powerin_array, 99)), 2)
+        output.powerin_min = round(
+            float(np.percentile(output_raw.powerin_array, 1)), 2)
+        output.powerin_av = round(
+            float(np.average(output_raw.powerin_array)), 3)
 
         output.voltout_pk = round(
             float(np.percentile(output_raw.voltout_array, 99)), 2)
@@ -200,37 +221,20 @@ def captureAllSingle(Samples, Time_Scale):
             np.sqrt(np.mean(np.square(output_raw.voltout_array))), 2)
         output.voltout_av = round(
             float(np.average(np.absolute(output_raw.voltout_array))), 3)
+        
+        output.ampout_pk = round(
+            float(np.percentile(output_raw.ampout_array, 99)), 2)
+        output.ampout_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.ampout_array))), 3)
+        output.ampout_av = round(
+            float(np.average(np.absolute(output_raw.ampout_array))), 3)
 
         output.powerout_pk = round(
             float(np.percentile(output_raw.powerout_array, 99)), 2)
         output.powerout_rms = round(
             np.sqrt(np.mean(np.square(output_raw.powerout_array))), 3)
-        output.powerout_av = round(float(np.average(output_raw.powerout_array)*2), 2)
-
-        output.voltin_max = round(
-            float(np.percentile(output_raw.voltin_array, 99)), 2)
-        output.voltin_min = round(
-            float(np.percentile(output_raw.voltin_array, 1)), 2)
-        output.voltin_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.voltin_array))), 3)
-        output.voltin_av = round(
-            float(np.average(np.absolute(output_raw.voltin_array))), 3)
-
-        output.ampin_max = round(
-            float(np.percentile(output_raw.ampin_array, 99)), 3)
-        output.ampin_min = round(
-            float(np.percentile(output_raw.ampin_array, 1)), 3)
-        output.ampin_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.ampin_array))), 3)
-        output.ampin_rms = round(
-            float(np.average(np.absolute(output_raw.ampin_array))), 3)
-        
-        output.powerin_pk = round(
-            float(np.percentile(output_raw.powerin_array, 99)), 2)
-        output.powerin_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.powerin_array))), 3)
-        output.powerin_av = round(
-            float(np.average(np.absolute(output_raw.powerin_array))), 3)
+        output.powerout_av = round(
+            float(np.average(output_raw.powerout_array)*2), 2)
 
         output.capturetime = round(time.perf_counter() - start_time, 2)
 
@@ -241,7 +245,6 @@ def captureAllSingle(Samples, Time_Scale):
     output.errorcounts = error_counts
 
     return output, output_raw
-
 
 
 def collectOscilloscopeData():
@@ -259,6 +262,7 @@ def collectOscilloscopeData():
         if (CHANNEL_LIST[i].enabled is True):
             CHANNEL_LIST[i].data = device.query_binary_values(str.format(
                 f'C{CHANNEL_LIST[i].id}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)
+
 
 def configureScopeHorizontalAxis(CaptureTime_us):
     # Supported Configurations for Siglent SDS1104
@@ -281,10 +285,11 @@ def configureScopeHorizontalAxis(CaptureTime_us):
         TIME_INFO.div = TimePerDivision_us
         TIME_INFO.delay = TriggerDelay_us
 
+
 def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
 
     # Output Volts -> mV -> 4 sections -> 200% of data
-    VoltsPerDivision_outV = math.ceil(inputVoltage/4*2)
+    VoltsPerDivision_outV = math.ceil(inputVoltage/4*1.2)
     updateVDIV(CHANNEL_LIST[0], VoltsPerDivision_outV)
 
     # Output Amps -> A -> 4 sections -> Arms to Apkpk -> 150% of data
@@ -293,11 +298,11 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
 
     # INPUT_VOLTS
     # Set Scaling so that the display shows +/-50% of input voltage
-    VoltsPerDivision_inV = math.ceil(inputVoltage*.20 / 8)
+    VoltsPerDivision_inV = math.ceil(inputVoltage / 8 / 2)
     updateVDIV(CHANNEL_LIST[2], VoltsPerDivision_inV)
-
+    time.sleep(0.1)
     # Set Offset Equal to Input Voltage so trace is centered in display
-    VoltsOffset_inV = -inputVoltage + VoltsPerDivision_inV
+    VoltsOffset_inV = -inputVoltage
     updateOFFSET(CHANNEL_LIST[2], VoltsOffset_inV)
 
     # INPUT AMPS - Calculate peak amps
@@ -305,6 +310,7 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     updateVDIV(CHANNEL_LIST[3], AmpsPerDivision_inA)
 
 ###################### Support Functions ######################
+
 
 def setTrigger(ChannelID, LevelmV):
     # Set Trigger Mode
@@ -318,6 +324,7 @@ def setTrigger(ChannelID, LevelmV):
     # Set Trigger Slope Positive
     device.write(f'C{ChannelID}:TRIG_SLOPE POS')
 
+
 def configureChannel(ChannelID, Attenuation, OffsetV, Unit):
     # Set Voltage Channel to Volts
     device.write(f'C{ChannelID}:UNIT {Unit}')
@@ -328,12 +335,14 @@ def configureChannel(ChannelID, Attenuation, OffsetV, Unit):
     # Set Voltage Channel Vertical Offset to 0
     device.write(f'C{ChannelID}:OFFSET {OffsetV}V')
 
+
 def initializeChannels(channel_list):
     for i in range(len(channel_list)):
         if (channel_list[i].enabled is False):
             device.write(f'C{channel_list[i].id}:TRACE OFF')
         else:
             device.write(f'C{channel_list[i].id}:TRACE ON')
+
 
 def findSharedChannels(channel_list):
     if (((channel_list[0].enabled is True) & (channel_list[1].enabled is True)) |
@@ -342,21 +351,27 @@ def findSharedChannels(channel_list):
     else:
         TIME_INFO.sharedchannels = 1
 
+
 def setSparsing(Samples, Time_Scale):
     if (TIME_INFO.div == 20000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples/50)/TIME_INFO.sharedchannels))
+        Sparsing = int(
+            np.ceil(Time_Scale/(Samples/50)/TIME_INFO.sharedchannels))
     elif (TIME_INFO.div == 10000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples/100)/TIME_INFO.sharedchannels))
+        Sparsing = int(
+            np.ceil(Time_Scale/(Samples/100)/TIME_INFO.sharedchannels))
     elif (TIME_INFO.div == 5000):
         # At 5ms/div, we have 17.5M samples per screen instead of just 14
         Sparsing = int(np.ceil(Time_Scale*17.5/14 /
                        (Samples/200)/TIME_INFO.sharedchannels))
     elif (TIME_INFO.div == 2000):
-        Sparsing = int(np.ceil(Time_Scale/(Samples/500)/TIME_INFO.sharedchannels))
+        Sparsing = int(
+            np.ceil(Time_Scale/(Samples/500)/TIME_INFO.sharedchannels))
     else:
-        Sparsing = int(np.ceil(Time_Scale/(Samples/1000)/TIME_INFO.sharedchannels))
+        Sparsing = int(
+            np.ceil(Time_Scale/(Samples/1000)/TIME_INFO.sharedchannels))
 
     return Sparsing
+
 
 def createTimeArray(Samples, Div, Delay, Sparsing):
     ################# TIME PROCESS #################
@@ -377,6 +392,7 @@ def createTimeArray(Samples, Div, Delay, Sparsing):
     output = np.array(output)
     return output
 
+
 def parseOscilloscopeResponse(response):
     match = re.search(r'([-+]?\d*\.\d+([eE][-+]?\d+)?)', response)
 
@@ -386,17 +402,20 @@ def parseOscilloscopeResponse(response):
         processedResponse = None
     return processedResponse
 
+
 def updateVDIV(channel, newvdiv):
     if (newvdiv != channel.div):
         device.write(f'C{channel.id}:VOLT_DIV {newvdiv}V')
         print(f'{channel.name} VDIV Old:{channel.div}, New:{newvdiv}')
         channel.div = newvdiv
 
+
 def updateOFFSET(channel, newoffset):
     if (newoffset != channel.offset):
         device.write(f'C{channel.id}:OFFSET {newoffset}V')
         print(f'{channel.name} OFFSET Old:{channel.offset}, New:{newoffset}')
         channel.offset = newoffset
+
 
 def findFirstInstanceGreaterThan(array, value):
     output = [0, 0]
@@ -406,10 +425,12 @@ def findFirstInstanceGreaterThan(array, value):
             break
     return output
 
+
 def findClosestValue(array, value):
     array = np.asarray(array)
     idx = (np.abs(array-value)).argmin()
     return [idx, array[idx]]
+
 
 def processBinaryData(Waveform, Div, Offset):
     result = []

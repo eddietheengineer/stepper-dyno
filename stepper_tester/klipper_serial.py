@@ -55,7 +55,10 @@ def readtemp():
              for value in temps_split if value[0] in string.ascii_uppercase]
     ser.close()
     output = temperaturedata()
-    output.rpitemp = float(temps[0])
-    output.drivertemp = float(temps[1])
-    output.steppertemp = float(temps[2])
+
+    # Add check to make sure data is valid
+    if (len(temps) >= 3):
+        output.rpitemp = float(temps[0])
+        output.drivertemp = float(temps[1])
+        output.steppertemp = float(temps[2])
     return output
