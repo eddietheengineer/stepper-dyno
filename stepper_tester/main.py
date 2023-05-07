@@ -7,11 +7,11 @@ import terminal_display
 import concurrent.futures
 import csv_logger
 import sys
+
 import change_config
 # import plotting
 from dataclasses import dataclass, fields
 
-# str(input('Model Number: ') or "17HS19-2004S1")
 model_number = 'LDO_42STH48-2504AC'
 test_id = '5.6.23a'
 step_angle = 1.8
@@ -49,14 +49,21 @@ cycle_time = 0
 @dataclass
 class TestIdData():
     stepper_model: str = 'LDO_42STH48-2504AC'
-    phase_resistance: float = 1.5
     test_id: str = '5.6.23a'
     test_counter: int = 0
     test_voltage: int = 0
     test_microstep: int = 0
     test_current: float = 0
     test_speed: int = 0
+    test_resetcounter: int = 0
 
+@dataclass
+class AllData():
+    id: TestIdData
+    mech: loadcell.loadcelldata
+    psu: powersupply.powersupplydata
+    scope: scope_capture.oscilloscopedata
+    temps: klipper_serial.temperaturedata
 
 @dataclass
 class PowerSummary():
@@ -68,14 +75,6 @@ class PowerSummary():
     motorpower_ironloss = float
     motorpower_miscerror = float
     motorpower_output = float
-
-
-@dataclass
-class IterativeData():
-    voltage_setting: int
-    microstep_setting: int
-    current_setting: float
-    speed_setting: int
 
 
 def main():
@@ -93,7 +92,7 @@ def main():
             # Update Microstep configuration, then restart Klipper to accept change
             change_config.updateMS(microstep)
             klipper_serial.restart()
-            print('      Starting Sleep Time - 10 seconds')
+            print('      Starting Sleep Time - 15 seconds')
             time.sleep(15)
 
             for tmc_currentx10 in range(int(tmc_start*10), int(tmc_end*10)+int(tmc_step*10), int(tmc_step*10)):
@@ -114,8 +113,15 @@ def main():
                     global cycle_time
                     global reset_counter
 
-                    output = TestIdData(
-                        test_counter=testcounter, test_voltage=voltage_setting, test_microstep=microstep, test_current=tmc_current, test_speed=speed)
+                    testid = TestIdData(test_counter=testcounter,
+                                        test_voltage=voltage_setting,
+                                        test_microstep=microstep,
+                                        test_current=tmc_current,
+                                        test_speed=speed)
+                    
+                    # Write Summary Array
+                    testid_label = tuple(field.name for field in fields(testid))
+                    testid_data = tuple(testid.__dict__.values())
 
                     # If previous peak current was < tmc_current*1.4, change to
                     if (previous_peak_current < tmc_current * 1.4 * .5) & (previous_peak_current > 0.1):
@@ -141,12 +147,6 @@ def main():
                     # Start Stepper Motor
                     klipper_serial.move(TIME_MOVE, speed, ACCELERATION)
 
-                    # Write Summary Array
-                    iterative_data_label = ('model_number', 'test_id', 'test_counter',
-                                            'voltage_setting', 'microstep', 'tmc_current', 'speed', 'reset_counter')
-                    iterative_data = (model_number, test_id, testcounter, voltage_setting,
-                                      microstep, tmc_current, speed, reset_counter)
-
                     # Wait for Stepper to accelerate
                     time.sleep(speed/ACCELERATION+0.5)
 
@@ -160,32 +160,34 @@ def main():
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
                     # Process Load Cell Data
-                    loadcelldata = f3.result()
-                    mech_data_label = tuple(
-                        field.name for field in fields(loadcelldata))
-                    mech_data = tuple(loadcelldata.__dict__.values())
+                    mech = f3.result()
+                    mech_label = tuple(field.name for field in fields(mech))
+                    mech_data = tuple(mech.__dict__.values())
 
                     # Process Power Supply Data
-                    powersupplydata = f2.result()
-                    powersupply_data_label = tuple(
-                        field.name for field in fields(powersupplydata))
-                    powersupply_data = tuple(powersupplydata.__dict__.values())
+                    psu = f2.result()
+                    psu_label = tuple(field.name for field in fields(psu))
+                    psu_data = tuple(psu.__dict__.values())
 
                     # Process Oscilloscope Data
-                    oscilloscopedata, oscilloscoperawdata = f1.result()
-                    oscilloscope_data_label = tuple(field.name for field in fields(oscilloscopedata))
-                    oscilloscope_data = tuple(oscilloscopedata.__dict__.values())
+                    scope, scoperaw = f1.result()
+                    scope_label = tuple(field.name for field in fields(scope))
+                    scope_data = tuple(scope.__dict__.values())
 
                     # Process Temperature
-                    temperaturedata = klipper_serial.readtemp()
-                    temperature_label = tuple(field.name for field in fields(temperaturedata))
-                    temperature_data = tuple(temperaturedata.__dict__.values())
+                    temps = klipper_serial.readtemp()
+                    temp_label = tuple(field.name for field in fields(temps))
+                    temp_data = tuple(temps.__dict__.values())
+
+                    testcompletedata = AllData(id=testid, mech= mech, psu=psu, scope=scope, temps=temps)
+                    
+                    header, data = convertData(testcompletedata)
 
                     # Check if oscilloscope actually captured data
-                    if ((oscilloscopedata.errorcounts == 0) & (oscilloscopedata.errorpct < 5)):
+                    if ((scope.errorcounts == 0) & (scope.errorpct < 5)):
 
                         # Check if motor has stalled
-                        if (loadcelldata.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):
+                        if (mech.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):
                             failcount += 1
                             print(f'Failcount: {failcount}, Speed: {speed}')
 
@@ -210,12 +212,12 @@ def main():
                         cycle_data = (round(cycle_time, 2), TIME_MOVE)
 
                         # Combine Output Summary Data
-                        output_data_label = iterative_data_label + powersupply_data_label + \
-                            oscilloscope_data_label + mech_data_label + \
-                            cycle_data_label + temperature_label
-                        output_data = iterative_data + powersupply_data + \
-                            oscilloscope_data + mech_data + \
-                            cycle_data + temperature_data
+                        output_data_label = testid_label + psu_label + \
+                            scope_label + mech_label + \
+                            cycle_data_label + temp_label
+                        output_data = testid_data + psu_data + \
+                            scope_data + mech_data + \
+                            cycle_data + temp_data
 
                         # Write Header File Data to CSV File
                         if (testcounter == 1):
@@ -227,17 +229,18 @@ def main():
                             model_number, test_id, output_data)
 
                         # Write Output Data to Terminal
-                        terminal_display.display(
-                            testcounter, output_data_label, output_data)
+                        #terminal_display.display(
+                        #    testcounter, output_data_label, output_data)
+                        terminal_display.display(testcounter, header, data)
 
                         # End Speed Iteration
                         speed += speed_step
-                        previous_peak_current = oscilloscopedata.current_pk
+                        previous_peak_current = scope.current_pk
                         testcounter += 1
 
                     else:
                         print(
-                            f'Reset Cycle: Error Count = {oscilloscopedata.errorcounts}, Error % = {oscilloscopedata.errorpct}')
+                            f'Reset Cycle: Error Count = {scope.errorcounts}, Error % = {scope.errorpct}')
                         klipper_serial.restart()
                         time.sleep(15)
                         klipper_serial.current(tmc_current)
@@ -275,22 +278,34 @@ def find_closest(array, target):
 
 
 def calculatepower(testdata, loadcell, powersupply, oscilloscope):
-    PowerSummary.motorpower_output = loadcell.motorpower
+    output = PowerSummary()
+    output.motorpower_output = loadcell.motorpower
 
-    PowerSummary.driverpower_in = powersupply.measuredpower
-    PowerSummary.driverpower_out = oscilloscope.power_av
-    PowerSummary.driverpower_loss = PowerSummary.driverpower_in - \
-        PowerSummary.driverpower_out
+    output.driverpower_in = powersupply.measuredpower
+    output.driverpower_out = oscilloscope.power_av
+    output.driverpower_loss = output.driverpower_in - \
+        output.driverpower_out
 
-    PowerSummary.motorpower_totalloss = PowerSummary.driverpower_out - \
-        PowerSummary.motorpower_output
-    PowerSummary.motorpower_copperloss = 2 * \
+    output.motorpower_totalloss = output.driverpower_out - \
+        output.motorpower_output
+    output.motorpower_copperloss = 2 * \
         oscilloscope.current_av**2 * motor_resistance
-    PowerSummary.motorpower_ironloss = testdata.speed * \
+    output.motorpower_ironloss = testdata.speed * \
         oscilloscope.current_pk * iron_constant
-    PowerSummary.motorpower_miscerror = PowerSummary.motorpower_totalloss - \
-        PowerSummary.motorpower_copperloss - PowerSummary.motorpower_ironloss
+    output.motorpower_miscerror = output.motorpower_totalloss - \
+        output.motorpower_copperloss - output.motorpower_ironloss
 
+def convertData(data):
+    flat_dict = {}
+    header_file = []
+    data_file = []
+    for k, v in data.__dict__.items():
+        for k2, v2 in v.__dict__.items():
+            new_key = f'{k}.{k2}'
+            flat_dict[new_key] = v2
+            header_file.append(new_key)
+            data_file.append(flat_dict[new_key])
+    return header_file, data_file
 
 if __name__ == "__main__":
 
