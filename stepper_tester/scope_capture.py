@@ -32,7 +32,7 @@ class timeconfiguration:
 class oscilloscopedata:
     capturetime: float = 0
     errorcounts: int = 0
-    errortime: float = 0
+    errorpct: float = 0
     capturerawlength: int = 0
     capturetrimlength: int = 0
     sparsing: int = 0
@@ -176,7 +176,7 @@ def captureAllSingle(Samples, Time_Scale):
         output_raw.ampin_array = AMP_IN_RESULT
 
         output.capturetrimlength = len(output_raw.voltage_array)
-        output.errortime = abs(
+        output.errorpct = abs(
             round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
 
         output.current_pk = round(

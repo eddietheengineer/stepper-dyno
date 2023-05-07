@@ -44,9 +44,9 @@ def measure(sampleCount, speed):
     filtered_data = reject_range_outliers(np.array(measurements))
 
     summary = loadcelldata()
-    summary.grams = max(np.average(filtered_data), 0)
-    summary.torque = summary.grams / 1000 * 9.81 * 135 / 10
-    summary.motorpower = summary.torque / 100 * speed * 2 * 3.1415/40
+    summary.grams = round(max(float(np.average(filtered_data)), 0),2)
+    summary.torque = round(summary.grams / 1000 * 9.81 * 135 / 10,2)
+    summary.motorpower = round(summary.torque / 100 * speed * 2 * 3.1415/40,2)
     summary.capturetime = round(time.perf_counter()-start, 2)
     summary.samples = len(filtered_data)
     return summary

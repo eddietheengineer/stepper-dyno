@@ -22,8 +22,8 @@ speed_start = 100  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
 speed_step = 100  # int(input('Speed Step: ') or 50)
 
-tmc_start = 2.0  # float(input('TMC Current Start: ') or 0.5)
-tmc_end = 2.0  # float(input('TMC Current End: ') or 1.0)
+tmc_start = 1.0  # float(input('TMC Current Start: ') or 0.5)
+tmc_end = 1.0  # float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.8  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
@@ -31,10 +31,7 @@ tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
 microstep_array = [16]
-
-voltage_start = 48
-voltage_end = 48
-voltage_step = 12
+voltage_array = [24, 48]
 
 reset_counter = 1
 
@@ -84,9 +81,9 @@ class IterativeData():
 def main():
 
     # Start and connect to all devices
-    initialize_dyno(voltage_start)
+    initialize_dyno(voltage_array[0])
 
-    for voltage_setting in range(voltage_start, voltage_end+voltage_step, voltage_step):
+    for _, voltage_setting in enumerate(voltage_array):
 
         # Set Power Supply Voltage
         powersupply.voltage_setting(voltage_setting)
@@ -166,38 +163,26 @@ def main():
                     loadcelldata = f3.result()
                     mech_data_label = tuple(
                         field.name for field in fields(loadcelldata))
-                    mech_data = (round(loadcelldata.grams, 3), round(loadcelldata.torque, 3), round(
-                        loadcelldata.motorpower, 3), loadcelldata.samples)
+                    mech_data = tuple(loadcelldata.__dict__.values())
 
                     # Process Power Supply Data
                     powersupplydata = f2.result()
                     powersupply_data_label = tuple(
                         field.name for field in fields(powersupplydata))
-                    powersupply_data = (
-                        powersupplydata.measuredvoltage, powersupplydata.measuredpower)
+                    powersupply_data = tuple(powersupplydata.__dict__.values())
 
                     # Process Oscilloscope Data
                     oscilloscopedata, oscilloscoperawdata = f1.result()
-                    # oscilloscope_data_label1 = tuple(field.name for field in fields(oscilloscopedata))[4:]
-                    oscilloscope_data_label = (
-                        'voltage_rms', 'current_pkpk', 'current_rms',  'current_average', 'power_average', 'power_max')
-                    oscilloscope_data = (oscilloscopedata.voltage_rms, oscilloscopedata.current_pk, oscilloscopedata.current_rms,
-                                         oscilloscopedata.current_av, oscilloscopedata.power_av, oscilloscopedata.power_pk)
-
-                    oscilloscope_reference_label = (
-                        'sparsing', 'orig_samples', 'trim_samples', 'error_delta', 'errors')
-                    oscilloscope_reference_data = (oscilloscopedata.sparsing, oscilloscopedata.capturerawlength,
-                                                   oscilloscopedata.capturetrimlength, oscilloscopedata.errortime, oscilloscopedata.errorcounts)
+                    oscilloscope_data_label = tuple(field.name for field in fields(oscilloscopedata))
+                    oscilloscope_data = tuple(oscilloscopedata.__dict__.values())
 
                     # Process Temperature
                     temperaturedata = klipper_serial.readtemp()
-                    temperature_label = (
-                        'rpi_temp', 'driver_temp', 'stepper_temp')
-                    temperature_data = (
-                        temperaturedata.rpitemp, temperaturedata.drivertemp, temperaturedata.steppertemp)
+                    temperature_label = tuple(field.name for field in fields(temperaturedata))
+                    temperature_data = tuple(temperaturedata.__dict__.values())
 
                     # Check if oscilloscope actually captured data
-                    if ((oscilloscopedata.errorcounts == 0) & (round(oscilloscopedata.errortime, 1) < 5)):
+                    if ((oscilloscopedata.errorcounts == 0) & (oscilloscopedata.errorpct < 5)):
 
                         # Check if motor has stalled
                         if (loadcelldata.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):
@@ -226,11 +211,11 @@ def main():
 
                         # Combine Output Summary Data
                         output_data_label = iterative_data_label + powersupply_data_label + \
-                            oscilloscope_data_label + oscilloscope_reference_label + \
-                            mech_data_label+cycle_data_label + temperature_label
+                            oscilloscope_data_label + mech_data_label + \
+                            cycle_data_label + temperature_label
                         output_data = iterative_data + powersupply_data + \
-                            oscilloscope_data + oscilloscope_reference_data + \
-                            mech_data + cycle_data + temperature_data
+                            oscilloscope_data + mech_data + \
+                            cycle_data + temperature_data
 
                         # Write Header File Data to CSV File
                         if (testcounter == 1):
@@ -252,7 +237,7 @@ def main():
 
                     else:
                         print(
-                            f'Reset Cycle: Error Count = {oscilloscopedata.errorcounts}, Error Delta = {oscilloscopedata.errortime}')
+                            f'Reset Cycle: Error Count = {oscilloscopedata.errorcounts}, Error % = {oscilloscopedata.errorpct}')
                         klipper_serial.restart()
                         time.sleep(15)
                         klipper_serial.current(tmc_current)
