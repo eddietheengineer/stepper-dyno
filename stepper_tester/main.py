@@ -13,30 +13,30 @@ import change_config
 from dataclasses import dataclass, fields
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.6.23a'
+test_id = '5.6.23'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
 
-speed_start = 100  # int(input('Start Speed: ') or 50)
+speed_start = 10  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 100  # int(input('Speed Step: ') or 50)
+speed_step = 10  # int(input('Speed Step: ') or 50)
 
 tmc_start = 1.0  # float(input('TMC Current Start: ') or 0.5)
-tmc_end = 1.0  # float(input('TMC Current End: ') or 1.0)
-tmc_step = 0.8  # float(input('TMC Current Step: ') or 0.1)
+tmc_end = 2.0  # float(input('TMC Current End: ') or 1.0)
+tmc_step = 0.5  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
                   1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
-microstep_array = [16]
+microstep_array = [16,128]
 voltage_array = [24, 48]
 
 reset_counter = 1
 
 ACCELERATION = 10000
-SAMPLE_TARGET = 101000
+SAMPLE_TARGET = 501000
 
 TIME_MOVE = 10
 CYCLES_MEASURED = 1
