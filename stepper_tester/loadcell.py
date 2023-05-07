@@ -36,19 +36,24 @@ def tare():
 
 def measure(sampleCount, speed):
     start = time.perf_counter()
+    summary = loadcelldata()
     measurements = []
     for _ in range(sampleCount):
         val = hx.get_weight(5)
         measurements.append(val)
         time.sleep(0.1)
     filtered_data = reject_range_outliers(np.array(measurements))
+    filtered_average = float(np.average(filtered_data))
+    if (filtered_average is np.nan):
+        summary.grams = max(round(float(np.average(measurements)),2),0)
+        summary.samples = len(measurements)
+    else:
+        summary.grams = max(round(filtered_average,2),0)
+        summary.samples = len(filtered_data)
 
-    summary = loadcelldata()
-    summary.grams = round(max(float(np.average(filtered_data)), 0), 2)
     summary.torque = round(summary.grams / 1000 * 9.81 * 135 / 10, 2)
     summary.motorpower = round(summary.torque / 100 * speed * 2 * 3.1415/40, 2)
     summary.capturetime = round(time.perf_counter()-start, 2)
-    summary.samples = len(filtered_data)
     return summary
 
 
