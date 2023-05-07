@@ -5,11 +5,11 @@ import scope_capture
 import time
 import terminal_display
 import concurrent.futures
-import csv_logger
+import csvlogger
 import sys
 
 import change_config
-# import plotting
+import plotting
 from dataclasses import dataclass, fields
 
 model_number = 'LDO_42STH48-2504AC'
@@ -56,6 +56,8 @@ class TestIdData():
     test_current: float = 0
     test_speed: int = 0
     test_resetcounter: int = 0
+    test_steppertime: float = 0
+    test_cycletime: float = 0
 
 @dataclass
 class AllData():
@@ -97,12 +99,16 @@ def main():
 
             for tmc_currentx10 in range(int(tmc_start*10), int(tmc_end*10)+int(tmc_step*10), int(tmc_step*10)):
 
-                # Set TMC Driver Current
+                # Find closest valid setting
                 tmc_current = find_closest(tmc_array_5160, tmc_currentx10/10)
+                # Set current via Klipper
                 klipper_serial.current(tmc_current)
+                # Set Oscilloscope scales for new current
                 scope_capture.configureScopeVerticalAxis(
                     voltage_setting, tmc_current)
-                previous_peak_current = tmc_current
+                # Initialize scaling variable to capture reduced current
+                previous_peak_current = tmc_current*1.414
+                # Set Speed Value to the start value
                 speed = speed_start
 
                 while (speed <= speed_end):
@@ -113,17 +119,14 @@ def main():
                     global cycle_time
                     global reset_counter
 
+                    #Initialize Test identification dataClass
                     testid = TestIdData(test_counter=testcounter,
                                         test_voltage=voltage_setting,
                                         test_microstep=microstep,
                                         test_current=tmc_current,
                                         test_speed=speed)
-                    
-                    # Write Summary Array
-                    testid_label = tuple(field.name for field in fields(testid))
-                    testid_data = tuple(testid.__dict__.values())
 
-                    # If previous peak current was < tmc_current*1.4, change to
+                    # If previous peak current was < 50% of tmc_current*1.4, zoom in
                     if (previous_peak_current < tmc_current * 1.4 * .5) & (previous_peak_current > 0.1):
                         scope_capture.configureScopeVerticalAxis(
                             voltage_setting, previous_peak_current/1.414)
@@ -142,7 +145,7 @@ def main():
 
                     # Calculate length of 1 Cycle
                     Cycle_Length_us = round(
-                        4*step_angle/(speed/40*360)*1000*1000 * CYCLES_MEASURED, 0)
+                        4*step_angle/(speed/40*360)*1000*1000, 0)
 
                     # Start Stepper Motor
                     klipper_serial.move(TIME_MOVE, speed, ACCELERATION)
@@ -152,82 +155,69 @@ def main():
 
                     # Start threads for measurement devices
                     with concurrent.futures.ThreadPoolExecutor() as executor:
+                        # Capture 10 samples from loadcell
                         f3 = executor.submit(loadcell.measure, 10, speed)
+                        # Capture readings (1V, 1A, 10W) from powersupply
                         f2 = executor.submit(powersupply.measure, 10)
+                        # Initialize capture of X full cycles from Oscilloscope
                         f1 = executor.submit(
-                            scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us)
+                            scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
                         # f4 = executor.submit(klipper_serial.readtemp)
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
-                    # Process Load Cell Data
+                    # Record Load Cell Data
                     mech = f3.result()
-                    mech_label = tuple(field.name for field in fields(mech))
-                    mech_data = tuple(mech.__dict__.values())
 
-                    # Process Power Supply Data
+                    # Record Power Supply Data
                     psu = f2.result()
-                    psu_label = tuple(field.name for field in fields(psu))
-                    psu_data = tuple(psu.__dict__.values())
 
-                    # Process Oscilloscope Data
+                    # Record Oscilloscope Data
                     scope, scoperaw = f1.result()
-                    scope_label = tuple(field.name for field in fields(scope))
-                    scope_data = tuple(scope.__dict__.values())
 
-                    # Process Temperature
+                    # Record Temperatures
                     temps = klipper_serial.readtemp()
-                    temp_label = tuple(field.name for field in fields(temps))
-                    temp_data = tuple(temps.__dict__.values())
 
-                    testcompletedata = AllData(id=testid, mech= mech, psu=psu, scope=scope, temps=temps)
+                    #Combine all measured data
+                    alldata = AllData(id=testid, mech= mech, psu=psu, scope=scope, temps=temps)
                     
-                    header, data = convertData(testcompletedata)
+                    #Create flattened data for CSV/Terminal
+                    header, data = convertData(alldata)
 
                     # Check if oscilloscope actually captured data
-                    if ((scope.errorcounts == 0) & (scope.errorpct < 5)):
+                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5)):
 
                         # Check if motor has stalled
-                        if (mech.grams < 5) and (speed > 500) and (NO_LOAD_TEST is False):
+                        if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
                             failcount += 1
-                            print(f'Failcount: {failcount}, Speed: {speed}')
+                            print(f'Failcount: {failcount}, Speed: {alldata.id.test_speed}')
 
                         if (failcount > 2):
                             # If motor has stalled twice, exit for loop
                             failcount = 0
                             break
 
-                        if (failcount == 0):
+                        elif (failcount == 0):
                             # Plot Oscilloscope Data if motor hasn't stalled
-                            #plotting.plotosData(output_data, output_data_label, oscilloscopedata.oscilloscope_time_array, oscilloscopedata.oscilloscope_voltage_array,
-                            #                    oscilloscopedata.oscilloscope_current_array, oscilloscopedata.oscilloscope_power_array)
-                            csv_logger.writeoscilloscopedata(testid, scoperaw)
+                            plotting.plotosData(alldata, scoperaw)
+                            csvlogger.writeoscilloscopedata(alldata.id, scoperaw)
 
-                        # Process Cycle Data
+                        # Calculate Cycle Time
                         cycle_time = (time.perf_counter() - start_time)
-                        cycle_data_label = ('cycle_time', 'TIME_MOVE')
-                        cycle_data = (round(cycle_time, 2), TIME_MOVE)
-
-                        # Combine Output Summary Data
-                        output_data_label = testid_label + psu_label + \
-                            scope_label + mech_label + \
-                            cycle_data_label + temp_label
-                        output_data = testid_data + psu_data + \
-                            scope_data + mech_data + \
-                            cycle_data + temp_data
+                        alldata.id.test_cycletime = cycle_time
 
                         # Write Header File Data to CSV File
                         if (testcounter == 1):
-                            csv_logger.writeheader(
-                                model_number, test_id, output_data_label)
+                            csvlogger.writeheader(
+                                alldata.id.stepper_model, alldata.id.test_id, header)
 
                         # Write to CSV File
-                        csv_logger.writedata(
-                            model_number, test_id, output_data)
+                        csvlogger.writedata(
+                            alldata.id.stepper_model, alldata.id.test_id, data)
 
                         # Write Output Data to Terminal
                         #terminal_display.display(
                         #    testcounter, output_data_label, output_data)
-                        terminal_display.display(testcounter, header, data)
+                        terminal_display.display(alldata.id.test_counter, header, data)
 
                         # End Speed Iteration
                         speed += speed_step

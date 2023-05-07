@@ -10,6 +10,7 @@ riden = Riden(port="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
 @dataclass
 class powersupplydata:
     measuredvoltage: float = 0
+    measuredcurrent: float = 0
     measuredpower: float = 0
     samplecount: int = 0
     capturetime: float = 0
@@ -27,6 +28,7 @@ def measure(sampleCount):
     output.measuredpower = round(np.average(filtered_data), 2)
     output.capturetime = round(time.perf_counter() - start, 2)
     output.samplecount = len(filtered_data)
+    output.measuredcurrent = riden.get_i_out()
     output.measuredvoltage = riden.get_v_out()
     return output
 

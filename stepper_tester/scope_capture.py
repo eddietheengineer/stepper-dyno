@@ -73,8 +73,6 @@ class oscilloscoperawdata:
     powerout_array: np.ndarray = np.array([])
 
 
-
-
 TIME_INFO = timeconfiguration()
 CHANNEL_LIST = [channelconfiguration(id=1, enabled=True, name='VOLT_OUT', attn=10, unit='V'),
                 channelconfiguration(id=2, enabled=True, name='AMP_OUT', attn=10, unit='A'),

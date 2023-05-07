@@ -3,33 +3,32 @@ import os
 import time
 
 
-def plotosData(output_data, index_data, TIME_AXIS, RESULT1, RESULT2, RESULT3):
+def plotosData(alldata, array):
     start_time = time.perf_counter()
-    Model_Number = output_data[index_data.index('model_number')]
-    Test_ID = output_data[index_data.index('test_id')]
-    Test_Number = output_data[index_data.index('test_counter')]
-    Voltage = output_data[index_data.index('voltage_setting')]
-    Microstep = output_data[index_data.index('microstep')]
-    Current = output_data[index_data.index('tmc_current')]
-    Speed = output_data[index_data.index('speed')]
+    Model_Number = alldata.id.stepper_model
+    Test_ID = alldata.id.test_id
+    Test_Number = alldata.id.test_counter
+    Voltage = alldata.id.test_voltage
+    Microstep = alldata.id.test_microstep
+    Current = alldata.id.test_current
+    Speed = alldata.id.test_speed
 
-    Power = output_data[index_data.index('p_supply')]
-    Current_RMS = output_data[index_data.index('current_rms')]
-    Current_PkPk = output_data[index_data.index('current_pkpk')]
-    Torque = output_data[index_data.index('torque')]
+    Power = alldata.psu.measuredpower
+    Current_RMS = alldata.scope.ampout_rms
+    Torque = alldata.mech.torque
 
     Top_Line = f'Model: {Model_Number} Test ID: {Test_ID} Test Number: {Test_Number}'
     Middle_Line = f'Voltage: {Voltage} V, Microstep: {Microstep}, Current: {Current} A, Speed: {Speed} mm/s'
-    Bottom_Line = f'Power: {Power:0.1f}, Current (RMS): {Current_RMS:0.2f}, Current (Peak): {Current_PkPk:0.2f}, Torque: {Torque:0.1f}'
+    #Bottom_Line = f'Power: {Power:0.1f}, Current (RMS): {Current_RMS:0.2f}, Torque: {Torque:0.1f}'
 
     plotter.rcParams['figure.figsize'] = [8, 4.5]
     fig, ax1 = plotter.subplots()
     ax2 = ax1.twinx()
     ax3 = ax1.twinx()
-    ax1.plot(TIME_AXIS, RESULT1, linewidth=0.5, label="Voltage")
-    ax2.plot(TIME_AXIS, RESULT2, linewidth=0.5,
+    ax1.plot(array.time_array, array.voltout_array, linewidth=0.5, label="Voltage")
+    ax2.plot(array.time_array, array.ampout_array, linewidth=0.5,
              label="Current", color="orange")
-    ax3.plot(TIME_AXIS, RESULT3, linewidth=0.5, label="Power", color="red")
+    ax3.plot(array.time_array, array.powerout_array, linewidth=0.5, label="Power", color="red")
     plotter.title(f'{Top_Line} \n {Middle_Line}')
     ax1.set_xlabel("Time (ms)")
     ax1.set_ylabel("Volts")
