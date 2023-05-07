@@ -55,16 +55,15 @@ def plotSummaryDataNew(model_number):
         maxspeed_test = np.amax(output_data[x][:, speed_index])
         if (maxspeed_test > maxspeed):
             maxspeed = maxspeed_test
-    plot_title = '%s Driver Power' % model_number
+    plot_title = f'{model_number} Driver Power'
     plotter.legend()
     plotter.margins(0)
-    plotter.grid('True')
-    plotter.title('%s' % (plot_title))
+    plotter.grid(grid=True)
+    plotter.title(f'{plot_title}')
     plotter.xlabel("Speed (mm/s)")
     plotter.xlim(0, (maxspeed+200))
     plotter.ylabel("Driver Power (W)")
-    plotter.savefig('/home/pi/Desktop/%s/%s_Test.png' %
-                    (model_number, plot_title), dpi=300)
+    plotter.savefig(f'/home/pi/Desktop/{model_number}/{plot_title}_Test.png', dpi=300)
     plotter.clf()
     plotter.close()
 
