@@ -10,19 +10,19 @@ import sys
 
 import change_config
 import plotting
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.7.23a'
+test_id = '5.7.23e'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
 
-speed_start = 10  # int(input('Start Speed: ') or 50)
-speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 10  # int(input('Speed Step: ') or 50)
+speed_start = 100  # int(input('Start Speed: ') or 50)
+speed_end = 1000  # int(input('Ending Speed: ') or 300)
+speed_step = 100  # int(input('Speed Step: ') or 50)
 
-tmc_start = 1.0  # float(input('TMC Current Start: ') or 0.5)
+tmc_start = 2.0  # float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.0  # float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.5  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23, 1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
@@ -30,8 +30,8 @@ tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.
                   1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
-microstep_array = [16,128]
-voltage_array = [24, 48]
+microstep_array = [16]
+voltage_array = [48]
 
 reset_counter = 1
 
@@ -60,23 +60,24 @@ class TestIdData():
     test_cycletime: float = 0
 
 @dataclass
+class PowerSummary():
+    driverpower_in: float = 0
+    driverpower_out: float = 0
+    driverpower_loss: float = 0
+    motorpower_totalloss: float = 0
+    motorpower_copperloss: float = 0
+    motorpower_ironloss: float = 0
+    motorpower_miscerror: float = 0
+    motorpower_output: float = 0
+
+@dataclass
 class AllData():
     id: TestIdData
     mech: loadcell.loadcelldata
     psu: powersupply.powersupplydata
     scope: scope_capture.oscilloscopedata
     temps: klipper_serial.temperaturedata
-
-@dataclass
-class PowerSummary():
-    driverpower_in = float
-    driverpower_out = float
-    driverpower_loss = float
-    motorpower_totalloss = float
-    motorpower_copperloss = float
-    motorpower_ironloss = float
-    motorpower_miscerror = float
-    motorpower_output = float
+    powersummary: PowerSummary
 
 
 def main():
@@ -165,45 +166,42 @@ def main():
                         # f4 = executor.submit(klipper_serial.readtemp)
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
-                    # Record Load Cell Data
-                    mech = f3.result()
-
-                    # Record Power Supply Data
-                    psu = f2.result()
-
                     # Record Oscilloscope Data
                     scope, scoperaw = f1.result()
 
-                    # Record Temperatures
-                    temps = klipper_serial.readtemp()
+                    powercalc = PowerSummary()
 
                     #Combine all measured data
-                    alldata = AllData(id=testid, mech= mech, psu=psu, scope=scope, temps=temps)
+                    alldata = AllData(id=testid, mech=f3.result(), psu=f2.result(), scope=scope, temps=klipper_serial.readtemp(), powersummary=powercalc)
                     
-                    #Create flattened data for CSV/Terminal
-                    header, data = convertData(alldata)
-
                     # Check if oscilloscope actually captured data
                     if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5)):
 
+                        alldata.powersummary = calculatepower(alldata)
+                        
                         # Check if motor has stalled
                         if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
                             failcount += 1
                             print(f'Failcount: {failcount}, Speed: {alldata.id.test_speed}')
 
-                        if (failcount > 2):
+                        if (failcount == 0):
+                            # Plot Oscilloscope Data if motor hasn't stalled
+                            plotting.plotosData(alldata, scoperaw, type='In')
+                            plotting.plotosData(alldata, scoperaw, type='Out')
+                            csvlogger.writeoscilloscopedata(alldata.id, scoperaw)
+
+                        elif (failcount > 2):
                             # If motor has stalled twice, exit for loop
                             failcount = 0
                             break
 
-                        elif (failcount == 0):
-                            # Plot Oscilloscope Data if motor hasn't stalled
-                            plotting.plotosData(alldata, scoperaw)
-                            csvlogger.writeoscilloscopedata(alldata.id, scoperaw)
-
                         # Calculate Cycle Time
-                        cycle_time = (time.perf_counter() - start_time)
+                        cycle_time = round(time.perf_counter() - start_time,1)
                         alldata.id.test_cycletime = cycle_time
+                        alldata.id.test_steppertime = TIME_MOVE
+
+                        #Create flattened data for CSV/Terminal
+                        header, data = convertData(alldata)
 
                         # Write Header File Data to CSV File
                         if (testcounter == 1):
@@ -263,23 +261,24 @@ def find_closest(array, target):
     return min(array, key=lambda x: abs(x - target))
 
 
-def calculatepower(testdata, loadcell, powersupply, oscilloscope):
+def calculatepower(alldata):
     output = PowerSummary()
-    output.motorpower_output = loadcell.motorpower
+    output.motorpower_output = alldata.mech.motorpower
 
-    output.driverpower_in = powersupply.measuredpower
-    output.driverpower_out = oscilloscope.power_av
-    output.driverpower_loss = output.driverpower_in - \
-        output.driverpower_out
+    output.driverpower_in = alldata.psu.measuredpower
+    output.driverpower_out = alldata.scope.powerout_av
+    output.driverpower_loss = round(output.driverpower_in - \
+        output.driverpower_out,2)
 
-    output.motorpower_totalloss = output.driverpower_out - \
-        output.motorpower_output
-    output.motorpower_copperloss = 2 * \
-        oscilloscope.current_av**2 * motor_resistance
-    output.motorpower_ironloss = testdata.speed * \
-        oscilloscope.current_pk * iron_constant
-    output.motorpower_miscerror = output.motorpower_totalloss - \
-        output.motorpower_copperloss - output.motorpower_ironloss
+    output.motorpower_totalloss = round(output.driverpower_out - \
+        output.motorpower_output,2)
+    output.motorpower_copperloss = round(2 * \
+        alldata.scope.ampout_av**2 * motor_resistance,2)
+    output.motorpower_ironloss = round(alldata.id.test_speed * \
+        alldata.scope.ampout_pk * iron_constant,2)
+    output.motorpower_miscerror = round(output.motorpower_totalloss - \
+        output.motorpower_copperloss - output.motorpower_ironloss,2)
+    return output
 
 def convertData(data):
     flat_dict = {}

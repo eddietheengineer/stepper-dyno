@@ -35,7 +35,7 @@ def writeoscilloscopedata(testiddata, raw):
     Current = testiddata.test_current
     Speed = testiddata.test_speed
 
-    filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Oscilloscope_Data/'
+    filepath = f'/home/pi/Desktop/RawDataArchive/{Model_Number}_{Test_ID}/Oscilloscope_Data/'
 
     if not os.path.exists(filepath):
         os.makedirs(filepath)

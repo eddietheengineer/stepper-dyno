@@ -30,30 +30,32 @@ class timeconfiguration:
 
 @dataclass
 class oscilloscopedata:
+    voltin_av: float = 0
+    voltin_rms: float = 0
+    voltin_max: float = 0
+    voltin_min: float = 0
+    ampin_av: float = 0
+    ampin_rms: float = 0
+    ampin_max: float = 0
+    ampin_min: float = 0
+    powerin_av: float = 0
+    powerin_rms: float = 0
+    powerin_pk: float = 0
+    voltout_av: float = 0
+    voltout_rms: float = 0
+    voltout_pk: float = 0
+    ampout_av: float = 0
+    ampout_rms: float = 0
+    ampout_pk: float = 0
+    powerout_av: float = 0
+    powerout_rms: float = 0
+    powerout_pk: float = 0
     capturetime: float = 0
     errorcounts: int = 0
     errorpct: float = 0
     capturerawlength: int = 0
     capturetrimlength: int = 0
     sparsing: int = 0
-    ampout_av: float = 0
-    ampout_rms: float = 0
-    ampout_pk: float = 0
-    voltout_av: float = 0
-    voltout_rms: float = 0
-    voltout_pk: float = 0
-    powerout_av: float = 0
-    powerout_rms: float = 0
-    powerout_pk: float = 0
-    voltin_av: float = 0
-    voltin_rms: float = 0
-    voltin_pk: float = 0
-    ampin_av: float = 0
-    ampin_rms: float = 0
-    ampin_pk: float = 0
-    powerin_av: float = 0
-    powerin_rms: float = 0
-    powerin_pk: float = 0
 
 @dataclass
 class recordsummary:
@@ -186,38 +188,49 @@ def captureAllSingle(Samples, Time_Scale):
             round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
 
         output.ampout_pk = round(
-            float(np.percentile(output_raw.ampout_array, 95)), 2)
+            float(np.percentile(output_raw.ampout_array, 99)), 2)
         output.ampout_rms = round(
             np.sqrt(np.mean(np.square(output_raw.ampout_array))), 3)
         output.ampout_av = round(
             float(np.average(np.absolute(output_raw.ampout_array))), 3)
 
         output.voltout_pk = round(
-            float(np.percentile(output_raw.voltout_array, 95)), 2)
+            float(np.percentile(output_raw.voltout_array, 99)), 2)
         output.voltout_rms = round(
             np.sqrt(np.mean(np.square(output_raw.voltout_array))), 2)
         output.voltout_av = round(
             float(np.average(np.absolute(output_raw.voltout_array))), 3)
 
         output.powerout_pk = round(
-            float(np.percentile(output_raw.powerout_array, 95)), 2)
+            float(np.percentile(output_raw.powerout_array, 99)), 2)
         output.powerout_rms = round(
             np.sqrt(np.mean(np.square(output_raw.powerout_array))), 3)
         output.powerout_av = round(float(np.average(output_raw.powerout_array)*2), 2)
 
-        output.voltin_pk = round(
-            float(np.percentile(output_raw.voltin_array, 95)), 2)
+        output.voltin_max = round(
+            float(np.percentile(output_raw.voltin_array, 99)), 2)
+        output.voltin_min = round(
+            float(np.percentile(output_raw.voltin_array, 1)), 2)
         output.voltin_rms = round(
             np.sqrt(np.mean(np.square(output_raw.voltin_array))), 3)
         output.voltin_av = round(
             float(np.average(np.absolute(output_raw.voltin_array))), 3)
 
-        output.ampin_pk = round(
-            float(np.percentile(output_raw.ampin_array, 95)), 2)
+        output.ampin_max = round(
+            float(np.percentile(output_raw.ampin_array, 99)), 3)
+        output.ampin_min = round(
+            float(np.percentile(output_raw.ampin_array, 1)), 3)
         output.ampin_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.ampin_array))), 2)
+            np.sqrt(np.mean(np.square(output_raw.ampin_array))), 3)
         output.ampin_rms = round(
             float(np.average(np.absolute(output_raw.ampin_array))), 3)
+        
+        output.powerin_pk = round(
+            float(np.percentile(output_raw.powerin_array, 99)), 2)
+        output.powerin_rms = round(
+            np.sqrt(np.mean(np.square(output_raw.powerin_array))), 3)
+        output.powerin_av = round(
+            float(np.average(np.absolute(output_raw.powerin_array))), 3)
 
         output.capturetime = round(time.perf_counter() - start_time, 2)
 

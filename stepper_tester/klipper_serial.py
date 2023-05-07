@@ -44,7 +44,7 @@ def move(time, speed, acceleration):
 def readtemp():
     ser = serial.Serial(
         "/home/pi/printer_data/comms/klippy.serial", baudrate=250000, timeout=1)
-    sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
+    sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser)) # type: ignore
     ser.write(str.encode("M105\n"))
     sio.flush()
     temps_raw = sio.readline()
