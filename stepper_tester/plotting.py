@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plotter
 import os
 import time
+import numpy as np
 
 
 def plotosData(alldata, array, type):
@@ -33,12 +34,13 @@ def plotosData(alldata, array, type):
         ax2.set_ylim(-4, 4)
         ax3.set_ylim(-160, 160)
     elif (type == 'In'):
-        ax1.plot(array.time_array, array.voltin_array, linewidth=0.5, label="Voltage")
-        ax2.plot(array.time_array, array.ampin_array, linewidth=0.5, label="Current", color="orange")
-        ax3.plot(array.time_array, array.powerin_array, linewidth=0.5, label="Power", color="red")
-        ax1.set_ylim(Voltage*.7, Voltage*1.05)
-        ax2.set_ylim(-5, 5)
-        ax3.set_ylim(-150, 300)
+        halfcycle = round(len(array.time_array)/2)
+        ax1.plot(array.time_array[:halfcycle], np.abs(array.voltout_array[:halfcycle]), linewidth=0.5, label="Stepper Voltage", color="orange")
+        ax2.plot(array.time_array[:halfcycle], array.powerout_array[:halfcycle], linewidth=0.5, label="Stepper Power", color="red")
+        ax3.plot(array.time_array[:halfcycle], array.voltin_array[:halfcycle], linewidth=0.5, label="Capacitor Voltage")
+        ax1.set_ylim(Voltage*.8, Voltage*1.2)
+        ax2.set_ylim(-160, 160)
+        ax3.set_ylim(Voltage*.8, Voltage*1.2)
     plotter.title(f'{Top_Line} \n {Middle_Line}')
     ax1.set_xlabel("Time (ms)")
     ax1.set_ylabel("Volts")
@@ -65,50 +67,3 @@ def plotosData(alldata, array, type):
     plotter.close()
     plot_time = time.perf_counter() - start_time
     return plot_time
-
-
-# def plotSummaryData(output_data, index_data):
-#     Model_Number = output_data[index_data.index('model_number')]
-#     Index = output_data[index_data.index('test_id')]
-#     Voltage = output_data[index_data.index('voltage_setting')]
-#     Current = output_data[index_data.index('tmc_current')]
-#     Speed = output_data[index_data.index('speed')]
-
-#     P_Supply = output_data[index_data.index('p_supply')]
-#     rms_current = output_data[index_data.index('current_rms')]
-#     torque = output_data[index_data.index('torque')]
-
-#     fig, ax1 = plotter.subplots()
-#     ax2 = ax1.twinx()  # 24_8
-#     ax3 = ax1.twinx()  # 24_10
-#     ax4 = ax1.twinx()  # 24_12
-#     ax5 = ax1.twinx()  # 24_14
-#     ax6 = ax1.twinx()  # 36_6
-#     ax7 = ax1.twinx()  # 36_8
-#     ax8 = ax1.twinx()  # 36_10
-#     ax9 = ax1.twinx()  # 36_12
-#     ax10 = ax1.twinx()  # 36_14
-#     ax11 = ax1.twinx()  # 48_6
-#     ax12 = ax1.twinx()  # 48_8
-#     ax13 = ax1.twinx()  # 48_10
-#     ax14 = ax1.twinx()  # 48_12
-#     ax15 = ax1.twinx()  # 48_14
-
-#     ax1.plot(data246[0], data246[1], 'blue:')
-#     ax2.plot(data248[0], data248[1], 'orange:')
-#     ax3.plot(data2410[0], data2410[1], 'green:')
-#     ax4.plot(data2412[0], data2412[1], 'red:')
-#     ax5.plot(data2414[0], data2414[1], 'purple:')
-
-#     ax6.plot(data246[0], data246[1], 'blue--')
-#     ax7.plot(data248[0], data248[1], 'orange--')
-#     ax8.plot(data2410[0], data2410[1], 'green--')
-#     ax9.plot(data2412[0], data2412[1], 'red--')
-#     ax10.plot(data2414[0], data2414[1], 'purple--')
-
-#     ax11.plot(data246[0], data246[1], 'blue-')
-#     ax12.plot(data248[0], data248[1], 'orange-')
-#     ax13.plot(data2410[0], data2410[1], 'green-')
-#     ax14.plot(data2412[0], data2412[1], 'red-')
-#     ax15.plot(data2414[0], data2414[1], 'purple-')
-#     plotter.show()

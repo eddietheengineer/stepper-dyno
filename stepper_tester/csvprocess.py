@@ -1,284 +1,138 @@
 import numpy as np
 import matplotlib.pyplot as plotter
+from dataclasses import dataclass
+import csv
+
+voltageindex = 3
+microstepindex = 4
+currentindex = 5
+speedindex = 6
+
+
+@dataclass
+class testchunk:
+    axisspeed: np.ndarray = np.array([])
+    axisvalues: np.ndarray = np.array([])
+    voltage: int = 0
+    microstep: int = 0
+    current: float = 0
+    linetype: str = ''
+    color: str = ''
+
+
+def readfile(model_number, test_id):
+    filename = f'/home/pi/Desktop/{model_number}_{test_id}/{model_number}_{test_id}_Summary.csv'
+    with open(filename, encoding='UTF-8') as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter = ',',quotechar = "'", skipinitialspace = True)
+        header = []
+        for row in csv_reader:
+            header = row
+            break
+    data = np.genfromtxt(filename, delimiter=',')
+    return header, data
+
+
+def parsetestparameters(array):
+    voltages = tuple(generateuniquevalues(array[1:, voltageindex]))
+    microsteps = tuple(generateuniquevalues(array[1:, microstepindex]))
+    currents = tuple(generateuniquevalues(array[1:, currentindex]))
+    currentsx100 = [int(element*100) for element in currents]
+    return voltages, microsteps, currentsx100
+
+
+def generateuniquevalues(array):
+    output = list(set(array))
+    output.sort(reverse=True)
+    return output
 
 
 def findindex(data):
     indices = []
     for x in range(1, len(data)):
-        if (data[x, 4] < data[(x-1), 4]):
+        if (data[x, speedindex] < data[(x-1), speedindex]):
             indices.append(x)
     return indices
 
 
-def outputdata(model_number, test_id):
-    filename = f'/home/pi/Desktop/{model_number}/{model_number}_{test_id}_Summary.csv'
-    data = np.genfromtxt(filename, delimiter=',')
-    idx = findindex(data)
-    array = np.split(data, idx)
+def split(array):
+    idx = findindex(array)
+    array = np.split(array, idx)
     return array
 
 
-def defineindexes(model_number, test_id):
-    array = outputdata(model_number, test_id)
-    voltages = []
-    currents = []
-    for _, value in enumerate(array):
-        voltages.append(value[1, 2])
-        currents.append(value[1, 3])
-    return voltages, currents
+def generatechunks(sarray, index, speedindex):
+    groupdata = []
+    for i, chunk in enumerate(sarray):
+        groupdata.append(testchunk())
+        groupdata[i].axisspeed = np.array(chunk[:, speedindex])
+        groupdata[i].axisvalues = np.array(chunk[:, index])
+        groupdata[i].voltage = int(chunk[1, voltageindex])
+        groupdata[i].microstep = int(chunk[1, microstepindex])
+        groupdata[i].current = int(chunk[1, currentindex]*100)
+    return groupdata
 
 
-def plotcolortype(voltage, current):
-    voltage_linestyles = [[12, 24, 36, 48], [':', '-.', '--', '-']]
-    current_colors = [[0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0], [
-        'magenta', 'darkviolet', 'blue', 'deepskyblue', 'green', 'orange', 'red', 'grey', 'black']]
-    linestyle = voltage_linestyles[1][voltage_linestyles[0].index(voltage)]
-    color = current_colors[1][current_colors[0].index(current)]
-    return linestyle, color
+def plotcolortype(originalarray, groupdata):
+    voltagevalues, _, currentvalues = parsetestparameters(originalarray)
+    # voltage_linestyles = [':', '-.', '--', '-']
+    voltage_linestyles = ['-', '--', '-.', ':']
+    current_colors = ['red', 'orange', 'green', 'blue',
+                      'darkviolet', 'black', 'grey', 'magenta', 'deepskyblue']
+    for i, _ in enumerate(groupdata):
+        groupdata[i].linetype = voltage_linestyles[voltagevalues.index(
+            groupdata[i].voltage)]
+        groupdata[i].color = current_colors[currentvalues.index(
+            groupdata[i].current)]
 
 
-def plotSummaryDataNew(model_number):
-    output_data = outputdata(model_number, test_id)
-    (voltages, currents) = defineindexes(model_number, test_id)
-    speed_index = 4
+def generateplot(modelnumber, testid, valueid, title, yaxislabel):
+    # Read in file
+    header, array = readfile(modelnumber, testid)
+    valueindex = header.index(valueid)
 
-    tests = [['Driver Power', 'RMS Current',
-              'RMS Voltage', 'Test Point Torque']]
-    plot_index = 8
+    # spilt array into chunks
+    splitarray = split(array)
+    splitarray.reverse()
 
+    # Convert chunks into dataclass objects
+    chunkdata = generatechunks(splitarray, valueindex, speedindex)
+
+    # Read dataclass objects and add linestyle and color formatting values
+    plotcolortype(array, chunkdata)
     maxspeed = 0
-    for x in range(len(output_data)):
-        label = '%s_%s' % (voltages[x], currents[x])
-        (linestyle, color) = plotcolortype(voltages[x], currents[x])
-        plotter.plot(output_data[x][0:-1, speed_index], output_data[x]
-                     [0:-1, plot_index], color=color, label=label, linestyle=linestyle)
-        maxspeed_test = np.amax(output_data[x][:, speed_index])
+
+    plotter.rcParams['figure.figsize'] = [8, 4.5]
+    plotter.margins(0)
+    plotter.grid(visible=True)
+
+    for _, chunk in enumerate(chunkdata):
+        label = f'{chunk.voltage}V {chunk.current/100}A'
+        plotter.plot(chunk.axisspeed, chunk.axisvalues, color=chunk.color,
+                     linestyle=chunk.linetype, label=label, linewidth=0.9)
+        maxspeed_test = np.amax(chunk.axisspeed)
         if (maxspeed_test > maxspeed):
             maxspeed = maxspeed_test
-    plot_title = '%s Driver Power' % model_number
+    plot_title = f'{modelnumber} {testid} {title}'
+
     plotter.legend()
-    plotter.margins(0)
-    plotter.grid('True')
-    plotter.title('%s' % (plot_title))
-    plotter.xlabel("Speed (mm/s)")
-    plotter.xlim(0, (maxspeed+200))
-    plotter.ylabel("Driver Power (W)")
-    plotter.savefig('/home/pi/Desktop/%s/%s_Test.png' %
-                    (model_number, plot_title), dpi=300)
-    plotter.clf()
-    plotter.close()
-
-
-def plotSummaryData(model_number, test_id):
-    output_data = outputdata(model_number, test_id)
-    data246 = output_data[0]
-    data248 = output_data[1]
-    data2410 = output_data[2]
-    data2412 = output_data[3]
-    data2414 = output_data[4]
-    data366 = output_data[5]
-    data368 = output_data[6]
-    data3610 = output_data[7]
-    data3612 = output_data[8]
-    data3614 = output_data[9]
-    data486 = output_data[10]
-    data488 = output_data[11]
-    data4810 = output_data[12]
-    data4812 = output_data[13]
-    data4814 = output_data[14]
-
-    speed_index = 4
-    plot_index = 8
-    plot_title = f'{model_number} Driver Power'
-
-    plotter.plot(data246[:, speed_index], data246[:,
-                 plot_index], 'blue', label='24_0.6', linestyle=':')
-    plotter.plot(data248[:, speed_index], data248[:, plot_index],
-                 'orange', label='24_0.8', linestyle=':')
-    plotter.plot(data2410[:, speed_index], data2410[:,
-                 plot_index], 'green', label='24_1.0', linestyle=':')
-    plotter.plot(data2412[:, speed_index], data2412[:,
-                 plot_index], 'red', label='24_1.2', linestyle=':')
-    plotter.plot(data2414[:, speed_index], data2414[:,
-                 plot_index], 'purple', label='24_1.4', linestyle=':')
-
-    plotter.plot(data366[:, speed_index], data366[:,
-                 plot_index], 'blue', label='36_0.6', linestyle='--')
-    plotter.plot(data368[:, speed_index], data368[:, plot_index],
-                 'orange', label='36_0.8', linestyle='--')
-    plotter.plot(data3610[:, speed_index], data3610[:,
-                 plot_index], 'green', label='36_1.0', linestyle='--')
-    plotter.plot(data3612[:, speed_index], data3612[:,
-                 plot_index], 'red', label='36_1.2', linestyle='--')
-    plotter.plot(data3614[:, speed_index], data3614[:,
-                 plot_index], 'purple', label='36_1.4', linestyle='--')
-
-    plotter.plot(data486[:, speed_index], data486[:,
-                 plot_index], 'blue', label='48_0.6')
-    plotter.plot(data488[:, speed_index], data488[:,
-                 plot_index], 'orange', label='48_0.8')
-    plotter.plot(data4810[:, speed_index], data4810[:,
-                 plot_index], 'green', label='48_1.0')
-    plotter.plot(data4812[:, speed_index],
-                 data4812[:, plot_index], 'red', label='48_1.2')
-    plotter.plot(data4814[:, speed_index], data4814[:,
-                 plot_index], 'purple', label='48_1.4')
-    plotter.legend()
-    plotter.margins(0)
-    plotter.grid('True')
-
     plotter.title(f'{plot_title}')
     plotter.xlabel("Speed (mm/s)")
-    plotter.ylabel("Driver Power (W)")
-
+    # add 30% buffer to give space for the legend
+    plotter.xlim(0, (maxspeed*1.3))
+    plotter.ylabel(yaxislabel)
+    plotter.ylim(bottom=0)
     plotter.savefig(
-        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
+        f'/home/pi/Desktop/{modelnumber}_{testid}/{plot_title}.png', dpi=240)
     plotter.clf()
     plotter.close()
 
-    speed_index = 4
-    plot_index = 9
-    plot_title = f'{model_number} RMS Current'
+def generateplots(modelnumber, testid):
+    generateplot(modelnumber, testid, 'psu.measuredpower', 'Driver Input Power', 'Power (W)')
+    generateplot(modelnumber, testid, 'scope.powerout_av', 'Driver Output Power', 'Power (W)')
+    generateplot(modelnumber, testid, 'mech.motorpower', 'Mechanical Motor Power', 'Power (W)')
+    generateplot(modelnumber, testid, 'scope.ampout_rms', 'Stepper Current (RMS)', 'Current (A)')
 
-    plotter.plot(data246[:, speed_index], data246[:,
-                 plot_index], 'blue', label='24_0.6', linestyle=':')
-    plotter.plot(data248[:, speed_index], data248[:, plot_index],
-                 'orange', label='24_0.8', linestyle=':')
-    plotter.plot(data2410[:, speed_index], data2410[:,
-                 plot_index], 'green', label='24_1.0', linestyle=':')
-    plotter.plot(data2412[:, speed_index], data2412[:,
-                 plot_index], 'red', label='24_1.2', linestyle=':')
-    plotter.plot(data2414[:, speed_index], data2414[:,
-                 plot_index], 'purple', label='24_1.4', linestyle=':')
-
-    plotter.plot(data366[:, speed_index], data366[:,
-                 plot_index], 'blue', label='36_0.6', linestyle='--')
-    plotter.plot(data368[:, speed_index], data368[:, plot_index],
-                 'orange', label='36_0.8', linestyle='--')
-    plotter.plot(data3610[:, speed_index], data3610[:,
-                 plot_index], 'green', label='36_1.0', linestyle='--')
-    plotter.plot(data3612[:, speed_index], data3612[:,
-                 plot_index], 'red', label='36_1.2', linestyle='--')
-    plotter.plot(data3614[:, speed_index], data3614[:,
-                 plot_index], 'purple', label='36_1.4', linestyle='--')
-
-    plotter.plot(data486[:, speed_index], data486[:,
-                 plot_index], 'blue', label='48_0.6')
-    plotter.plot(data488[:, speed_index], data488[:,
-                 plot_index], 'orange', label='48_0.8')
-    plotter.plot(data4810[:, speed_index], data4810[:,
-                 plot_index], 'green', label='48_1.0')
-    plotter.plot(data4812[:, speed_index],
-                 data4812[:, plot_index], 'red', label='48_1.2')
-    plotter.plot(data4814[:, speed_index], data4814[:,
-                 plot_index], 'purple', label='48_1.4')
-    plotter.legend()
-    plotter.margins(0)
-    plotter.grid('True')
-
-    plotter.title('%s' % (plot_title))
-    plotter.xlabel("Speed (mm/s)")
-    plotter.ylabel("RMS Current (A)")
-
-    plotter.savefig(
-        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
-    plotter.clf()
-    plotter.close()
-
-    speed_index = 4
-    plot_index = 11
-    plot_title = f'{model_number} RMS Voltage'
-
-    plotter.plot(data246[:, speed_index], data246[:,
-                 plot_index], 'blue', label='24_0.6', linestyle=':')
-    plotter.plot(data248[:, speed_index], data248[:, plot_index],
-                 'orange', label='24_0.8', linestyle=':')
-    plotter.plot(data2410[:, speed_index], data2410[:,
-                 plot_index], 'green', label='24_1.0', linestyle=':')
-    plotter.plot(data2412[:, speed_index], data2412[:,
-                 plot_index], 'red', label='24_1.2', linestyle=':')
-    plotter.plot(data2414[:, speed_index], data2414[:,
-                 plot_index], 'purple', label='24_1.4', linestyle=':')
-
-    plotter.plot(data366[:, speed_index], data366[:,
-                 plot_index], 'blue', label='36_0.6', linestyle='--')
-    plotter.plot(data368[:, speed_index], data368[:, plot_index],
-                 'orange', label='36_0.8', linestyle='--')
-    plotter.plot(data3610[:, speed_index], data3610[:,
-                 plot_index], 'green', label='36_1.0', linestyle='--')
-    plotter.plot(data3612[:, speed_index], data3612[:,
-                 plot_index], 'red', label='36_1.2', linestyle='--')
-    plotter.plot(data3614[:, speed_index], data3614[:,
-                 plot_index], 'purple', label='36_1.4', linestyle='--')
-
-    plotter.plot(data486[:, speed_index], data486[:,
-                 plot_index], 'blue', label='48_0.6')
-    plotter.plot(data488[:, speed_index], data488[:,
-                 plot_index], 'orange', label='48_0.8')
-    plotter.plot(data4810[:, speed_index], data4810[:,
-                 plot_index], 'green', label='48_1.0')
-    plotter.plot(data4812[:, speed_index],
-                 data4812[:, plot_index], 'red', label='48_1.2')
-    plotter.plot(data4814[:, speed_index], data4814[:,
-                 plot_index], 'purple', label='48_1.4')
-    plotter.legend()
-    plotter.margins(0)
-    plotter.grid('True')
-
-    plotter.title(f'{plot_title}')
-    plotter.xlabel("Speed (mm/s)")
-    plotter.ylabel("RMS Voltage (V))")
-
-    plotter.savefig(
-        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
-    plotter.clf()
-    plotter.close()
-
-    speed_index = 4
-    plot_index = 13
-    plot_title = f'{model_number} Test Point Torque'
-
-    plotter.plot(data246[:, speed_index], data246[:,
-                 plot_index], 'blue', label='24_0.6', linestyle=':')
-    plotter.plot(data248[:, speed_index], data248[:, plot_index],
-                 'orange', label='24_0.8', linestyle=':')
-    plotter.plot(data2410[:, speed_index], data2410[:,
-                 plot_index], 'green', label='24_1.0', linestyle=':')
-    plotter.plot(data2412[:, speed_index], data2412[:,
-                 plot_index], 'red', label='24_1.2', linestyle=':')
-    plotter.plot(data2414[:, speed_index], data2414[:,
-                 plot_index], 'purple', label='24_1.4', linestyle=':')
-
-    plotter.plot(data366[:, speed_index], data366[:,
-                 plot_index], 'blue', label='36_0.6', linestyle='--')
-    plotter.plot(data368[:, speed_index], data368[:, plot_index],
-                 'orange', label='36_0.8', linestyle='--')
-    plotter.plot(data3610[:, speed_index], data3610[:,
-                 plot_index], 'green', label='36_1.0', linestyle='--')
-    plotter.plot(data3612[:, speed_index], data3612[:,
-                 plot_index], 'red', label='36_1.2', linestyle='--')
-    plotter.plot(data3614[:, speed_index], data3614[:,
-                 plot_index], 'purple', label='36_1.4', linestyle='--')
-
-    plotter.plot(data486[:, speed_index], data486[:,
-                 plot_index], 'blue', label='48_0.6')
-    plotter.plot(data488[:, speed_index], data488[:,
-                 plot_index], 'orange', label='48_0.8')
-    plotter.plot(data4810[:, speed_index], data4810[:,
-                 plot_index], 'green', label='48_1.0')
-    plotter.plot(data4812[:, speed_index],
-                 data4812[:, plot_index], 'red', label='48_1.2')
-    plotter.plot(data4814[:, speed_index], data4814[:,
-                 plot_index], 'purple', label='48_1.4')
-    plotter.legend()
-    plotter.margins(0)
-    plotter.grid('True')
-
-    plotter.title(f'{plot_title}')
-    plotter.xlabel("Speed (mm/s)")
-    plotter.ylabel("Test Torque (N-cm)")
-
-    plotter.savefig(
-        f'/home/pi/Desktop/{model_number}/{plot_title}.png', dpi=300)
-    plotter.clf()
-    plotter.close()
+    generateplot(modelnumber, testid,  'powersummary.driverpower_loss', 'Driver Power Loss', 'Power (W)')
+    generateplot(modelnumber, testid,  'powersummary.motorpower_totalloss', 'Stepper Motor Total Loss', 'Power (W)')
+    generateplot(modelnumber, testid,  'powersummary.motorpower_copperloss', 'Stepper Motor Copper Loss', 'Power (W)')
+    generateplot(modelnumber, testid,  'powersummary.motorpower_ironloss', 'Stepper Motor Iron Loss', 'Power (W)')
