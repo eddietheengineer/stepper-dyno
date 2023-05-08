@@ -8,13 +8,14 @@ import concurrent.futures
 import csvlogger
 import sys
 import csvprocess
+import audiocapture
 
 import change_config
 import plotting
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.7'
+test_id = '5.7.23'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -23,13 +24,13 @@ speed_start = 10  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
 speed_step = 10  # int(input('Speed Step: ') or 50)
 
-tmc_start = 0.6  # float(input('TMC Current Start: ') or 0.5)
-tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
-tmc_step = 0.6  # float(input('TMC Current Step: ') or 0.1)
+tmc_start = 0.62  # float(input('TMC Current Start: ') or 0.5)
+tmc_end = 1.8  # float(input('TMC Current End: ') or 1.0)
+tmc_step = 0.16  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23,
 #                        1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
 tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.94, 1.02, 1.09, 1.17, 1.25,
-                  1.33, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
+                  1.33, 1.4, 1.49, 1.56, 1.64, 1.72, 1.80, 1.88, 1.96, 2.03, 2.11, 2.19, 2.27, 2.35, 2.42, 2.54, 2.63, 2.71, 2.8]
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
 microstep_array = [16]
@@ -40,7 +41,7 @@ reset_counter = 1
 ACCELERATION = 10000
 SAMPLE_TARGET = 500100
 
-TIME_MOVE = 10
+TIME_MOVE = 15
 CYCLES_MEASURED = 1
 NO_LOAD_TEST = False
 testcounter = 1
@@ -72,6 +73,7 @@ class PowerSummary():
     motorpower_ironloss: float = 0
     motorpower_miscerror: float = 0
     motorpower_output: float = 0
+    failcount: int = 0
 
 
 @dataclass
@@ -102,10 +104,10 @@ def main():
             print('      Starting Sleep Time - 15 seconds')
             time.sleep(15)
 
-            for tmc_currentx10 in range(int(tmc_start*10), int(tmc_end*10)+int(tmc_step*10), int(tmc_step*10)):
+            for tmc_currentx100 in range(int(tmc_start*100), int(tmc_end*100)+int(tmc_step*100), int(tmc_step*100)):
 
                 # Find closest valid setting
-                tmc_current = find_closest(tmc_array_5160, tmc_currentx10/10)
+                tmc_current = find_closest(tmc_array_5160, tmc_currentx100/100)
                 # Set current via Klipper
                 klipper_serial.current(tmc_current)
                 # Set Oscilloscope scales for new current
@@ -167,7 +169,7 @@ def main():
                         # Initialize capture of X full cycles from Oscilloscope
                         f1 = executor.submit(
                             scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
-                        # f4 = executor.submit(klipper_serial.readtemp)
+                        f4 = executor.submit(audiocapture.recordAudio, testid, 5)
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
                     # Record Oscilloscope Data
@@ -182,13 +184,13 @@ def main():
                     # Check if oscilloscope actually captured data
                     if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5)):
 
-                        alldata.powersummary = calculatepower(alldata)
-
                         # Check if motor has stalled
                         if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
                             failcount += 1
                             print(
                                 f'Failcount: {failcount}, Speed: {alldata.id.test_speed}')
+
+                        alldata.powersummary = calculatepower(alldata,failcount)
 
                         if (failcount == 0):
                             # Plot Oscilloscope Data if motor hasn't stalled
@@ -269,8 +271,9 @@ def find_closest(array, target):
     return min(array, key=lambda x: abs(x - target))
 
 
-def calculatepower(alldata):
+def calculatepower(alldata, failcount):
     output = PowerSummary()
+    output.failcount = failcount
     output.motorpower_output = alldata.mech.motorpower
 
     output.driverpower_in = alldata.psu.measuredpower
@@ -282,9 +285,10 @@ def calculatepower(alldata):
                                         output.motorpower_output, 2)
     output.motorpower_copperloss = round(2 *
                                          alldata.scope.ampout_av**2 * motor_resistance, 2)
-    output.motorpower_ironloss = round(alldata.id.test_speed *
+    if (failcount > 0):
+        output.motorpower_ironloss = round(alldata.id.test_speed *
                                        alldata.scope.ampout_pk * iron_constant, 2)
-    output.motorpower_miscerror = round(output.motorpower_totalloss -
+        output.motorpower_miscerror = round(output.motorpower_totalloss -
                                         output.motorpower_copperloss - output.motorpower_ironloss, 2)
     return output
 
