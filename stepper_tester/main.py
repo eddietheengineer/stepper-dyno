@@ -7,20 +7,21 @@ import terminal_display
 import concurrent.futures
 import csvlogger
 import sys
+import csvprocess
 
 import change_config
 import plotting
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = 'generatetestcsv6'
+test_id = '5.7'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
 
-speed_start = 100  # int(input('Start Speed: ') or 50)
+speed_start = 10  # int(input('Start Speed: ') or 50)
 speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 100  # int(input('Speed Step: ') or 50)
+speed_step = 10  # int(input('Speed Step: ') or 50)
 
 tmc_start = 0.6  # float(input('TMC Current Start: ') or 0.5)
 tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
@@ -245,7 +246,7 @@ def main():
 
     # End Voltage Iteration
 
-    # csvprocess.plotSummaryData(model_number)
+    csvprocess.generateplots(model_number,test_id)
     shutdown_dyno()
 
 
