@@ -8,6 +8,7 @@ import concurrent.futures
 import csvlogger
 import sys
 import csvprocess
+import audiocapture
 
 import change_config
 import plotting
@@ -40,7 +41,7 @@ reset_counter = 1
 ACCELERATION = 10000
 SAMPLE_TARGET = 500100
 
-TIME_MOVE = 10
+TIME_MOVE = 15
 CYCLES_MEASURED = 1
 NO_LOAD_TEST = False
 testcounter = 1
@@ -167,7 +168,7 @@ def main():
                         # Initialize capture of X full cycles from Oscilloscope
                         f1 = executor.submit(
                             scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
-                        # f4 = executor.submit(klipper_serial.readtemp)
+                        f4 = executor.submit(audiocapture.recordAudio, testid, 5)
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
                     # Record Oscilloscope Data

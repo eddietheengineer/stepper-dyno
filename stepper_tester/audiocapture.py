@@ -4,14 +4,15 @@ from scipy.io.wavfile import write
 
 samplingfrequency = 48000
 
-def recordAudio(alldata, duration):
-    Model_Number = alldata.id.stepper_model
-    Test_ID = alldata.id.test_id
-    Test_Number = alldata.id.test_counter
-    Voltage = alldata.id.test_voltage
-    Microstep = alldata.id.test_microstep
-    Current = alldata.id.test_current
-    Speed = alldata.id.test_speed
+def recordAudio(testpoint, duration):
+    complete = 0
+    Model_Number = testpoint.stepper_model
+    Test_ID = testpoint.test_id
+    Test_Number = testpoint.test_counter
+    Voltage = testpoint.test_voltage
+    Microstep = testpoint.test_microstep
+    Current = testpoint.test_current
+    Speed = testpoint.test_speed
 
     filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Audio_Recording/'
 
@@ -23,4 +24,6 @@ def recordAudio(alldata, duration):
 
     filename = f'{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}_{Microstep}_{Current}_{Speed}.wav'
 
-    write(filename, samplingfrequency, myrecording)
+    write(f'{filepath}{filename}', samplingfrequency, myrecording)
+    complete = 1
+    return complete
