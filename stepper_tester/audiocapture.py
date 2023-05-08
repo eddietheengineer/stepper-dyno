@@ -14,7 +14,7 @@ def recordAudio(testpoint, duration):
     Current = testpoint.test_current
     Speed = testpoint.test_speed
 
-    filepath = f'/home/pi/Desktop/{Model_Number}_{Test_ID}/Audio_Recording/'
+    filepath = f'/home/pi/Desktop/RawDataArchive/{Model_Number}_{Test_ID}/Audio_Recording/'
 
     if not os.path.exists(filepath):
         os.makedirs(filepath)
