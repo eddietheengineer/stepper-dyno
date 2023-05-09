@@ -147,7 +147,7 @@ def main():
                     if (testcounter > 1):
                         TIME_MOVE = 10  # np.ceil(cycle_time)+1
 
-                    # Initiate Capture Timer
+                    # Initiate Cycle Time Measurement
                     start_time = time.perf_counter()
 
                     # Calculate length of 1 Cycle
@@ -157,7 +157,7 @@ def main():
                     # Start Stepper Motor
                     klipper_serial.move(TIME_MOVE, speed, ACCELERATION)
 
-                    # Wait for Stepper to accelerate
+                    # Wait for Stepper to accelerate, plus 0.5 second buffer
                     time.sleep(speed/ACCELERATION+0.5)
 
                     # Start threads for measurement devices
@@ -169,7 +169,8 @@ def main():
                         # Initialize capture of X full cycles from Oscilloscope
                         f1 = executor.submit(
                             scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
-                        f4 = executor.submit(audiocapture.recordAudio, testid, 5)
+                        _ = executor.submit(
+                            audiocapture.recordAudio, testid, 5)
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
                     # Record Oscilloscope Data
@@ -181,60 +182,66 @@ def main():
                     alldata = AllData(id=testid, mech=f3.result(), psu=f2.result(
                     ), scope=scope, temps=klipper_serial.readtemp(), powersummary=powercalc)
 
-                    # Check if oscilloscope actually captured data
-                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & (alldata.mech.samples > 3)):
+                    # Check if data successfully captured
+                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & (alldata.mech.samples > 0) & (alldata.psu.samplecount > 0)):
 
                         # Check if motor has stalled
                         if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
                             failcount += 1
                             print(
                                 f'Failcount: {failcount}, Speed: {alldata.id.test_speed}')
+                        else:
+                            failcount = 0
+                        
+                        # If successful test
+                        if (failcount == 0):    
+                            # Calculate power data
+                            alldata.powersummary = calculatepower(
+                                alldata, failcount)
 
-                        alldata.powersummary = calculatepower(alldata,failcount)
-
-                        if (failcount == 0):
-                            # Plot Oscilloscope Data if motor hasn't stalled
-                            plotting.plotosData(alldata, scoperaw, type='In')
-                            plotting.plotosData(alldata, scoperaw, type='Out')
+                            # Log Oscilloscope Data
                             csvlogger.writeoscilloscopedata(
                                 alldata.id, scoperaw)
 
-                        elif (failcount > 2):
-                            # If motor has stalled twice, exit for loop
+                            # Calculate Cycle Time
+                            cycle_time = round(time.perf_counter() - start_time, 1)
+                            alldata.id.test_cycletime = cycle_time
+                            alldata.id.test_steppertime = TIME_MOVE
+
+                            # Create flattened data for CSV/Terminal
+                            header, data = convertData(alldata)
+
+                            # Write Header File Data to CSV File
+                            if (testcounter == 1):
+                                csvlogger.writeheader(
+                                    alldata.id.stepper_model, alldata.id.test_id, header)
+
+                            # Write to CSV File
+                            csvlogger.writedata(
+                                alldata.id.stepper_model, alldata.id.test_id, data)
+
+                            # Write Output Data to Terminal
+                            terminal_display.display(
+                                alldata.id.test_counter, header, data)
+
+                            # End Speed Iteration
+                            speed += speed_step
+                            testcounter += 1
+                            previous_peak_current = scope.ampout_pk
+
+                        elif (failcount >= 2):
+                            # If motor has stalled twice, go to next test sequence
                             failcount = 0
                             break
-
-                        # Calculate Cycle Time
-                        cycle_time = round(time.perf_counter() - start_time, 1)
-                        alldata.id.test_cycletime = cycle_time
-                        alldata.id.test_steppertime = TIME_MOVE
-
-                        # Create flattened data for CSV/Terminal
-                        header, data = convertData(alldata)
-
-                        # Write Header File Data to CSV File
-                        if (testcounter == 1):
-                            csvlogger.writeheader(
-                                alldata.id.stepper_model, alldata.id.test_id, header)
-
-                        # Write to CSV File
-                        csvlogger.writedata(
-                            alldata.id.stepper_model, alldata.id.test_id, data)
-
-                        # Write Output Data to Terminal
-                        # terminal_display.display(
-                        #    testcounter, output_data_label, output_data)
-                        terminal_display.display(
-                            alldata.id.test_counter, header, data)
-
-                        # End Speed Iteration
-                        speed += speed_step
-                        previous_peak_current = scope.ampout_pk
-                        testcounter += 1
+                    
+                    # Try without restarting klipper once
+                    elif (reset_counter == 0):
+                        print('Try again')
+                        cycle_time = (time.perf_counter() - start_time)
+                        reset_counter += 1 
 
                     else:
-                        print(
-                            f'Reset Cycle: Error Count = {scope.errorcounts}, Error % = {scope.errorpct}')
+                        print('Try failed, restarting klipper')
                         klipper_serial.restart()
                         time.sleep(15)
                         klipper_serial.current(tmc_current)
@@ -248,7 +255,7 @@ def main():
 
     # End Voltage Iteration
 
-    csvprocess.generateplots(model_number,test_id)
+    csvprocess.generateplots(model_number, test_id)
     shutdown_dyno()
 
 
@@ -287,9 +294,9 @@ def calculatepower(alldata, failcount):
                                          alldata.scope.ampout_av**2 * motor_resistance, 2)
     if (failcount > 0):
         output.motorpower_ironloss = round(alldata.id.test_speed *
-                                       alldata.scope.ampout_pk * iron_constant, 2)
+                                           alldata.scope.ampout_pk * iron_constant, 2)
         output.motorpower_miscerror = round(output.motorpower_totalloss -
-                                        output.motorpower_copperloss - output.motorpower_ironloss, 2)
+                                            output.motorpower_copperloss - output.motorpower_ironloss, 2)
     return output
 
 

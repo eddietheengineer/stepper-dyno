@@ -5,7 +5,6 @@ from scipy.io.wavfile import write
 samplingfrequency = 48000
 
 def recordAudio(testpoint, duration):
-    complete = 0
     Model_Number = testpoint.stepper_model
     Test_ID = testpoint.test_id
     Test_Number = testpoint.test_counter
@@ -25,5 +24,3 @@ def recordAudio(testpoint, duration):
     filename = f'{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}_{Microstep}_{Current}_{Speed}.wav'
 
     write(f'{filepath}{filename}', samplingfrequency, myrecording)
-    complete = 1
-    return complete
