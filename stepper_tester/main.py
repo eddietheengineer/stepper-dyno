@@ -15,7 +15,7 @@ import plotting
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.7.23'
+test_id = '5.7.23p2'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
@@ -34,7 +34,7 @@ tmc_array_5160 = [0.08, 0.16, 0.23, 0.31, 0.39, 0.47, 0.63, 0.70, 0.78, 0.86, 0.
 
 # microstep_array_complete = [1, 2, 4, 8, 16, 32, 64, 128]
 microstep_array = [16]
-voltage_array = [12, 24, 36, 48]
+voltage_array = [48]
 
 reset_counter = 1
 
@@ -182,7 +182,7 @@ def main():
                     ), scope=scope, temps=klipper_serial.readtemp(), powersummary=powercalc)
 
                     # Check if oscilloscope actually captured data
-                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5)):
+                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & (alldata.mech.samples > 3)):
 
                         # Check if motor has stalled
                         if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
