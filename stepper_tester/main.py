@@ -1,7 +1,7 @@
 import klipper_serial
 import loadcell
 import powersupply
-import scope_capture
+import scope
 import time
 import terminal_display
 import concurrent.futures
@@ -69,7 +69,7 @@ class AllData():
     id: TestIdData
     mech: loadcell.loadcelldata
     psu: powersupply.powersupplydata
-    scope: scope_capture.oscilloscopedata
+    scope: scope.oscilloscopedata
     temps: klipper_serial.temperaturedata
     audio: np.ndarray = np.array([])
 
@@ -99,7 +99,7 @@ def main():
                 # Set current via Klipper
                 klipper_serial.current(tmc_current)
                 # Set Oscilloscope scales for new current
-                scope_capture.configureScopeVerticalAxis(
+                scope.configureScopeVerticalAxis(
                     voltage_setting, tmc_current)
                 # Initialize scaling variable to capture reduced current
                 previous_peak_current = tmc_current*1.414
@@ -137,7 +137,7 @@ def maintestloop(voltage_setting, microstep, tmc_current, speed, previous_peak_c
 
         # If previous peak current was < 50% of tmc_current*1.4, zoom in
         if (previous_peak_current < tmc_current * 1.4 * .5) & (previous_peak_current > 0.1):
-            scope_capture.configureScopeVerticalAxis(
+            scope.configureScopeVerticalAxis(
                 voltage_setting, previous_peak_current/1.414)
 
         # If previous move was longer than cycle time, delay until move is completed
@@ -165,21 +165,22 @@ def maintestloop(voltage_setting, microstep, tmc_current, speed, previous_peak_c
         # Start threads for measurement devices
         with concurrent.futures.ThreadPoolExecutor() as executor:
             # Capture 10 samples from loadcell
-            f3 = executor.submit(loadcell.measure, 10, speed)
+            f3 = executor.submit(loadcell.measure, 10)
             # Capture readings (1V, 1A, 10W) from powersupply
             f2 = executor.submit(powersupply.measure, 10)
             # Initialize capture of X full cycles from Oscilloscope
             f1 = executor.submit(
-                scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
+                scope.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
             f4 = executor.submit(
                 audiocapture.recordAudio, testid, 5)
 
         # Combine all measured data
-        alldata = AllData(id=testid, mech=f3.result(), psu=f2.result(
-        ), scope=f1.result(), audio=f4.result(), temps=klipper_serial.readtemp())
+        alldata = AllData(id=testid, mech=f3.result(), psu=f2.result(), 
+                          scope=f1.result(), audio=f4.result(), temps=klipper_serial.readtemp())
 
         # Check if data successfully captured
-        if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & (alldata.mech.samples > 0) & (alldata.psu.samplecount > 0)):
+        if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & 
+                (alldata.mech.samples > 0) & (alldata.psu.samplecount > 0)):
 
             # Check if motor has stalled
             if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
@@ -191,10 +192,6 @@ def maintestloop(voltage_setting, microstep, tmc_current, speed, previous_peak_c
 
             # If successful test
             if (failcount == 0):
-                # Calculate power data
-                alldata.powersummary = calculatepower(
-                    alldata, failcount)
-
                 # Log Oscilloscope Data
                 # csvlogger.writeoscilloscopedata(
                 #    alldata.id, scoperaw)
@@ -207,15 +204,6 @@ def maintestloop(voltage_setting, microstep, tmc_current, speed, previous_peak_c
                 # Create flattened data for CSV/Terminal
                 header, data = convertData(alldata)
 
-                # Write Header File Data to CSV File
-                if (testcounter == 1):
-                    csvlogger.writeheader(
-                        alldata.id.stepper_model, alldata.id.test_id, header)
-
-                # Write to CSV File
-                csvlogger.writedata(
-                    alldata.id.stepper_model, alldata.id.test_id, data)
-
                 # Write Output Data to Terminal
                 terminal_display.display(
                     alldata.id.test_counter, header, data)
@@ -223,7 +211,7 @@ def maintestloop(voltage_setting, microstep, tmc_current, speed, previous_peak_c
                 # End Speed Iteration
                 speed += speed_step
                 testcounter += 1
-                previous_peak_current = scope.ampout_pk
+                previous_peak_current = alldata.scope.peakamps
 
             elif (failcount >= 2):
                 # If motor has stalled twice, go to next test sequence
@@ -251,7 +239,7 @@ def initialize_dyno(voltage):
     klipper_serial.restart()
     time.sleep(1)
     loadcell.tare()
-    scope_capture.setupScope()
+    scope.setupScope()
 
 
 def shutdown_dyno():
@@ -263,28 +251,6 @@ def shutdown_dyno():
 
 def find_closest(array, target):
     return min(array, key=lambda x: abs(x - target))
-
-
-def calculatepower(alldata, failcount):
-    output = PowerSummary()
-    output.failcount = failcount
-    output.motorpower_output = alldata.mech.motorpower
-
-    output.driverpower_in = alldata.psu.measuredpower
-    output.driverpower_out = alldata.scope.powerout_av
-    output.driverpower_loss = round(output.driverpower_in -
-                                    output.driverpower_out, 2)
-
-    output.motorpower_totalloss = round(output.driverpower_out -
-                                        output.motorpower_output, 2)
-    output.motorpower_copperloss = round(2 *
-                                         alldata.scope.ampout_av**2 * motor_resistance, 2)
-    if (failcount > 0):
-        output.motorpower_ironloss = round(alldata.id.test_speed *
-                                           alldata.scope.ampout_pk * iron_constant, 2)
-        output.motorpower_miscerror = round(output.motorpower_totalloss -
-                                            output.motorpower_copperloss - output.motorpower_ironloss, 2)
-    return output
 
 
 def convertData(data):

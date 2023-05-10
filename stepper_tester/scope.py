@@ -35,6 +35,7 @@ class oscilloscopedata:
     ampin_array: np.ndarray = np.array([])
     voltout_array: np.ndarray = np.array([])
     ampout_array: np.ndarray = np.array([])
+    peakamps: float = 0
     capturetime: float = 0
     errorcounts: int = 0
     errorpct: float = 0
@@ -137,6 +138,8 @@ def captureAllSingle(Samples, CaptureTimeus):
             CHANNEL_LIST[2].data, CHANNEL_LIST[2].div, CHANNEL_LIST[2].offset, idx_start, idx_end)
         output.ampin_array = processBinaryData(
             CHANNEL_LIST[3].data, CHANNEL_LIST[3].div, CHANNEL_LIST[3].offset, idx_start, idx_end)
+        
+        output.peakamps = np.amax(output.ampout_array)
 
         output.capturetrimlength = len(output.voltout_array)
         output.errorpct = abs(
