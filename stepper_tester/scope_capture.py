@@ -30,52 +30,17 @@ class timeconfiguration:
 
 @dataclass
 class oscilloscopedata:
-    voltin_av: float = 0
-    voltin_rms: float = 0
-    voltin_max: float = 0
-    voltin_min: float = 0
-    ampin_av: float = 0
-    ampin_rms: float = 0
-    ampin_max: float = 0
-    ampin_min: float = 0
-    powerin_av: float = 0
-    powerin_rms: float = 0
-    powerin_max: float = 0
-    powerin_min: float = 0
-    voltout_av: float = 0
-    voltout_rms: float = 0
-    voltout_pk: float = 0
-    ampout_av: float = 0
-    ampout_rms: float = 0
-    ampout_pk: float = 0
-    powerout_av: float = 0
-    powerout_rms: float = 0
-    powerout_pk: float = 0
+    time_array: np.ndarray = np.array([])
+    voltin_array: np.ndarray = np.array([])
+    ampin_array: np.ndarray = np.array([])
+    voltout_array: np.ndarray = np.array([])
+    ampout_array: np.ndarray = np.array([])
     capturetime: float = 0
     errorcounts: int = 0
     errorpct: float = 0
     capturerawlength: int = 0
     capturetrimlength: int = 0
     sparsing: int = 0
-
-
-@dataclass
-class recordsummary:
-    average: float = 0
-    rms: float = 0
-    max: float = 0
-    min: float = 0
-
-
-@dataclass
-class oscilloscoperawdata:
-    time_array: np.ndarray = np.array([])
-    voltin_array: np.ndarray = np.array([])
-    ampin_array: np.ndarray = np.array([])
-    powerin_array: np.ndarray = np.array([])
-    voltout_array: np.ndarray = np.array([])
-    ampout_array: np.ndarray = np.array([])
-    powerout_array: np.ndarray = np.array([])
 
 
 TIME_INFO = timeconfiguration()
@@ -124,11 +89,11 @@ def setupScope():
             time.sleep(0.1)
 
 
-def captureAllSingle(Samples, Time_Scale):
+def captureAllSingle(Samples, CaptureTimeus):
     start_time = time.perf_counter()
 
-    configureScopeHorizontalAxis(Time_Scale)
-    TIME_INFO.sparsing = setSparsing(Samples, Time_Scale)
+    configureScopeHorizontalAxis(CaptureTimeus)
+    TIME_INFO.sparsing = setSparsing(Samples, CaptureTimeus)
 
     # Setup waveform capture
     device.write(str.format(
@@ -161,90 +126,28 @@ def captureAllSingle(Samples, Time_Scale):
 
         # Trim to length of one cycle
         [idx_start, _] = findClosestValue(TIME_AXIS, 0)
-        [idx_end, _] = findClosestValue(TIME_AXIS, (Time_Scale/1000))
+        [idx_end, _] = findClosestValue(TIME_AXIS, (CaptureTimeus/1000))
 
-        VOLTAGE_RESULT = processBinaryData(
-            CHANNEL_LIST[0].data, CHANNEL_LIST[0].div, CHANNEL_LIST[0].offset)
-        CURRENT_RESULT = processBinaryData(
-            CHANNEL_LIST[1].data, CHANNEL_LIST[1].div, CHANNEL_LIST[1].offset)
-        VOLT_IN_RESULT = processBinaryData(
-            CHANNEL_LIST[2].data, CHANNEL_LIST[2].div, CHANNEL_LIST[2].offset)
-        AMP_IN_RESULT = processBinaryData(
-            CHANNEL_LIST[3].data, CHANNEL_LIST[3].div, CHANNEL_LIST[3].offset)
+        output.time_array = np.array(TIME_AXIS[idx_start:idx_end])
+        output.voltout_array = processBinaryData(
+            CHANNEL_LIST[0].data, CHANNEL_LIST[0].div, CHANNEL_LIST[0].offset, idx_start, idx_end)
+        output.ampout_array = processBinaryData(
+            CHANNEL_LIST[1].data, CHANNEL_LIST[1].div, CHANNEL_LIST[1].offset, idx_start, idx_end)
+        output.voltin_array = processBinaryData(
+            CHANNEL_LIST[2].data, CHANNEL_LIST[2].div, CHANNEL_LIST[2].offset, idx_start, idx_end)
+        output.ampin_array = processBinaryData(
+            CHANNEL_LIST[3].data, CHANNEL_LIST[3].div, CHANNEL_LIST[3].offset, idx_start, idx_end)
 
-        TIME_AXIS = np.array(TIME_AXIS[idx_start:idx_end])
-        VOLTAGE_RESULT = np.array(VOLTAGE_RESULT[idx_start:idx_end])
-        CURRENT_RESULT = np.array(CURRENT_RESULT[idx_start:idx_end])
-        VOLT_IN_RESULT = np.array(VOLT_IN_RESULT[idx_start:idx_end])
-        AMP_IN_RESULT = np.array(AMP_IN_RESULT[idx_start:idx_end])*10
-        POWER_RESULT = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
-        POWER_IN_RESULT = np.multiply(VOLT_IN_RESULT, AMP_IN_RESULT)
-
-        output_raw = oscilloscoperawdata()
-        output_raw.time_array = TIME_AXIS
-        output_raw.voltout_array = VOLTAGE_RESULT
-        output_raw.ampout_array = CURRENT_RESULT
-        output_raw.powerout_array = POWER_RESULT
-        output_raw.voltin_array = VOLT_IN_RESULT
-        output_raw.ampin_array = AMP_IN_RESULT
-        output_raw.powerin_array = POWER_IN_RESULT
-
-        output.capturetrimlength = len(output_raw.voltin_array)
+        output.capturetrimlength = len(output.voltout_array)
         output.errorpct = abs(
-            round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
-
-        output.voltin_max = round(
-            float(np.percentile(output_raw.voltin_array, 99)), 2)
-        output.voltin_min = round(
-            float(np.percentile(output_raw.voltin_array, 1)), 2)
-        output.voltin_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.voltin_array))), 3)
-        output.voltin_av = round(float(np.average(output_raw.voltin_array)), 3)
-
-        output.ampin_max = round(
-            float(np.percentile(output_raw.ampin_array, 99)), 3)
-        output.ampin_min = round(
-            float(np.percentile(output_raw.ampin_array, 1)), 3)
-        output.ampin_av = round(
-            float(np.average(output_raw.ampin_array)), 3)
-
-        output.powerin_max = round(
-            float(np.percentile(output_raw.powerin_array, 99)), 2)
-        output.powerin_min = round(
-            float(np.percentile(output_raw.powerin_array, 1)), 2)
-        output.powerin_av = round(
-            float(np.average(output_raw.powerin_array)), 3)
-
-        output.voltout_pk = round(
-            float(np.percentile(output_raw.voltout_array, 99)), 2)
-        output.voltout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.voltout_array))), 2)
-        output.voltout_av = round(
-            float(np.average(np.absolute(output_raw.voltout_array))), 3)
-        
-        output.ampout_pk = round(
-            float(np.percentile(output_raw.ampout_array, 99)), 2)
-        output.ampout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.ampout_array))), 3)
-        output.ampout_av = round(
-            float(np.average(np.absolute(output_raw.ampout_array))), 3)
-
-        output.powerout_pk = round(
-            float(np.percentile(output_raw.powerout_array, 99)), 2)
-        output.powerout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.powerout_array))), 3)
-        output.powerout_av = round(
-            float(np.average(output_raw.powerout_array)*2), 2)
+            round((CaptureTimeus/1000 - output.time_array[-1])/(CaptureTimeus/1000)*100, 2))
 
         output.capturetime = round(time.perf_counter() - start_time, 2)
-
-    else:
-        output_raw = oscilloscoperawdata()
 
     output.sparsing = TIME_INFO.sparsing
     output.errorcounts = error_counts
 
-    return output, output_raw
+    return output
 
 
 def collectOscilloscopeData():
@@ -375,8 +278,7 @@ def setSparsing(Samples, Time_Scale):
 
 def createTimeArray(Samples, Div, Delay, Sparsing):
     ################# TIME PROCESS #################
-    TIME_INFO.samplerate = device.query('SAMPLE_RATE?')
-    TIME_INFO.samplerate = float(TIME_INFO.samplerate[len('SARA '):-5])
+    TIME_INFO.samplerate = int(device.query('SAMPLE_RATE?')[len('SARA '):-5])
     Time_Interval_ms = 1 / TIME_INFO.samplerate * 1000
 
     # get time interval, P143 in prog manual
@@ -432,7 +334,7 @@ def findClosestValue(array, value):
     return [idx, array[idx]]
 
 
-def processBinaryData(Waveform, Div, Offset):
+def processBinaryData(Waveform, Div, Offset, start, end):
     result = []
     # convert raw data to voltage, P142 in prog manual
     for item in Waveform:
@@ -440,6 +342,8 @@ def processBinaryData(Waveform, Div, Offset):
             result.append((item - 255) * (Div/25) - Offset)
         else:
             result.append(item * Div/25 - Offset)
+    result = np.array(result)[start:end]
+    result = result[start:end]
     return result
 
 # def parameterMeasureStart():

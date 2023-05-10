@@ -4,6 +4,7 @@ from scipy.io.wavfile import write
 
 samplingfrequency = 48000
 
+
 def recordAudio(testpoint, duration):
     Model_Number = testpoint.stepper_model
     Test_ID = testpoint.test_id
@@ -17,10 +18,12 @@ def recordAudio(testpoint, duration):
 
     if not os.path.exists(filepath):
         os.makedirs(filepath)
-    
-    myrecording = sd.rec(int(duration * samplingfrequency), samplerate=samplingfrequency, channels=2)
+
+    myrecording = sd.rec(int(duration * samplingfrequency),
+                         samplerate=samplingfrequency, channels=2)
     sd.wait()
 
     filename = f'{Model_Number}_{Test_ID}_{Test_Number}_{Voltage}_{Microstep}_{Current}_{Speed}.wav'
 
     write(f'{filepath}{filename}', samplingfrequency, myrecording)
+    return myrecording

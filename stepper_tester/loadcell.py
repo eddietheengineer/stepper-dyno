@@ -8,22 +8,19 @@ from dataclasses import dataclass
 
 @dataclass
 class loadcelldata:
+    grams_array: np.ndarray = np.array([])
     grams: float = 0
-    torque: float = 0
-    motorpower: float = 0
     capturetime: float = 0
     samples: int = 0
 
 
 referenceunit = 1085
-samplecount = 5
-
 hx = HX711(5, 6)
 hx.set_reading_format("MSB", "MSB")
 hx.set_reference_unit(referenceunit)
 
 
-def measure(sampleCount, speed):
+def measure(sampleCount):
     start = time.perf_counter()
     summary = loadcelldata()
     measurements = []
@@ -31,12 +28,11 @@ def measure(sampleCount, speed):
         val = hx.get_weight(5)
         measurements.append(val)
         time.sleep(0.1)
-    filtered_data = reject_range_outliers(np.array(measurements))
+    summary.grams_array = np.array(measurements)
+    filtered_data = reject_range_outliers(np.array(summary.grams_array))
     if (len(filtered_data) > 0):
         filtered_average = float(np.average(filtered_data))
         summary.grams = max(round(float(np.average(filtered_average)), 2), 0)
-        summary.torque = round(summary.grams / 1000 * 9.81 * 135 / 10, 2)
-        summary.motorpower = round(summary.torque / 100 * speed * 2 * 3.1415/40, 2)
         summary.samples = len(filtered_data)
 
     summary.capturetime = round(time.perf_counter()-start, 2)
