@@ -9,23 +9,26 @@ import csvlogger
 import sys
 import csvprocess
 import audiocapture
+import gifmaker
 
 import change_config
 import plotting
 from dataclasses import dataclass
 
 model_number = 'LDO_42STH48-2504AC'
-test_id = '5.7.23p2'
+test_id = '6.9_2.4A'
 step_angle = 1.8
 motor_resistance = 1.5
 iron_constant = 0.01
+customlength = 0
+customoffset = 20
 
-speed_start = 10  # int(input('Start Speed: ') or 50)
-speed_end = 3000  # int(input('Ending Speed: ') or 300)
-speed_step = 10  # int(input('Speed Step: ') or 50)
+speed_start = 1  # int(input('Start Speed: ') or 50)
+speed_end = 200  # int(input('Ending Speed: ') or 300)
+speed_step = 1  # int(input('Speed Step: ') or 50)
 
-tmc_start = 0.62  # float(input('TMC Current Start: ') or 0.5)
-tmc_end = 1.8  # float(input('TMC Current End: ') or 1.0)
+tmc_start = 2.4  # float(input('TMC Current Start: ') or 0.5)
+tmc_end = 2.4  # float(input('TMC Current End: ') or 1.0)
 tmc_step = 0.16  # float(input('TMC Current Step: ') or 0.1)
 # tmc_array_5160_small = [0.09, 0.18, 0.26, 0.35, 0.44, 0.53, 0.61, 0.70, 0.79, 0.88, 0.96, 1.14, 1.23,
 #                        1.31, 1.40, 1.49, 1.58, 1.66, 1.84, 1.93, 2.01, 2.10, 2.19, 2.28, 2.36, 2.54, 2.63, 2.71, 2.80]
@@ -119,7 +122,8 @@ def main():
                 speed = speed_start
 
                 while (speed <= speed_end):
-
+                    global customlength
+                    global customoffset
                     global TIME_MOVE
                     global testcounter
                     global failcount
@@ -151,8 +155,11 @@ def main():
                     start_time = time.perf_counter()
 
                     # Calculate length of 1 Cycle
-                    Cycle_Length_us = round(
+                    if customlength is 0:
+                        Cycle_Length_us = round(
                         4*step_angle/(speed/40*360)*1000*1000, 0)
+                    else: 
+                        Cycle_Length_us = customlength
 
                     # Start Stepper Motor
                     klipper_serial.move(TIME_MOVE, speed, ACCELERATION)
@@ -168,7 +175,7 @@ def main():
                         f2 = executor.submit(powersupply.measure, 10)
                         # Initialize capture of X full cycles from Oscilloscope
                         f1 = executor.submit(
-                            scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED)
+                            scope_capture.captureAllSingle, SAMPLE_TARGET, Cycle_Length_us * CYCLES_MEASURED, customoffset)
                         f4 = executor.submit(audiocapture.recordAudio, testid, 5)
                         # f5 = executor.submit(audio_capture.captureAudio, iterative_data, iterative_data_label,)
 
@@ -182,7 +189,7 @@ def main():
                     ), scope=scope, temps=klipper_serial.readtemp(), powersummary=powercalc)
 
                     # Check if oscilloscope actually captured data
-                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & (alldata.mech.samples > 3)):
+                    if ((alldata.scope.errorcounts == 0) & (alldata.scope.errorpct < 5) & (alldata.mech.samples > 0)):
 
                         # Check if motor has stalled
                         if (alldata.mech.grams < 5) and (alldata.id.test_speed > 500) and (NO_LOAD_TEST is False):
@@ -196,8 +203,8 @@ def main():
                             # Plot Oscilloscope Data if motor hasn't stalled
                             plotting.plotosData(alldata, scoperaw, type='In')
                             plotting.plotosData(alldata, scoperaw, type='Out')
-                            csvlogger.writeoscilloscopedata(
-                                alldata.id, scoperaw)
+                            #csvlogger.writeoscilloscopedata(
+                            #    alldata.id, scoperaw)
 
                         elif (failcount > 2):
                             # If motor has stalled twice, exit for loop
@@ -229,7 +236,7 @@ def main():
 
                         # End Speed Iteration
                         speed += speed_step
-                        previous_peak_current = scope.ampout_pk
+                        previous_peak_current = scope.ampout_max
                         testcounter += 1
 
                     else:
@@ -249,6 +256,7 @@ def main():
     # End Voltage Iteration
 
     csvprocess.generateplots(model_number,test_id)
+    gifmaker.generategif(test_id)
     shutdown_dyno()
 
 
@@ -261,8 +269,8 @@ def initialize_dyno(voltage):
 
 
 def shutdown_dyno():
-    powersupply.close()
-    klipper_serial.restart()
+    #powersupply.close()
+    #klipper_serial.restart()
     loadcell.close()
     print("Finished: Library closed, resources released")
 
