@@ -16,6 +16,7 @@ class channelconfiguration:
     offset: int = 0
     attn: int = 0
     unit: str = ''
+    binarydata: np.ndarray = np.array([])
     data: np.ndarray = np.array([])
 
 
@@ -44,13 +45,19 @@ class oscilloscopedata:
     powerin_min: float = 0
     voltout_av: float = 0
     voltout_rms: float = 0
-    voltout_pk: float = 0
+    voltout_max: float = 0
     ampout_av: float = 0
     ampout_rms: float = 0
-    ampout_pk: float = 0
+    ampout_max: float = 0
     powerout_av: float = 0
     powerout_rms: float = 0
-    powerout_pk: float = 0
+    powerout_max: float = 0
+    speed_av: float = 0
+    speed_min: float = 0
+    speed_max: float = 0
+    speed_stdev: float = 0
+    distance_error: float = 0
+    microstep_error: float = 0
     capturetime: float = 0
     errorcounts: int = 0
     errorpct: float = 0
@@ -76,26 +83,27 @@ class oscilloscoperawdata:
     voltout_array: np.ndarray = np.array([])
     ampout_array: np.ndarray = np.array([])
     powerout_array: np.ndarray = np.array([])
+    encoder_array: np.ndarray = np.array([])
+    encoder_ref_array: np.ndarray = np.array([])
 
 
 TIME_INFO = timeconfiguration()
 CHANNEL_LIST = [channelconfiguration(id=1, enabled=True, name='VOLT_OUT', attn=10, unit='V'),
-                channelconfiguration(id=2, enabled=True,
-                                     name='AMP_OUT', attn=10, unit='A'),
-                channelconfiguration(id=3, enabled=True,
-                                     name='VOLT_IN', attn=10, unit='V'),
-                channelconfiguration(id=4, enabled=True, name='AMP_IN', attn=10, unit='A', offset=-1)]
+                channelconfiguration(id=2, enabled=True, name='AMP_OUT', attn=10, unit='A'),
+                channelconfiguration(id=3, enabled=True, name='VOLT_IN', attn=10, unit='V', offset = -24, div=1),
+                channelconfiguration(id=4, enabled=True, name='ENCODER', attn=10, unit='V', offset = -2, div=1)]
 
 
 try:
     rm = visa.ResourceManager()
-    # device = rm.open_resource('USB0::62700::60984::SDSMMGKC6R0277::0::INSTR',query_delay=0.25)
-    device = rm.open_resource('TCPIP::192.168.1.128::INSTR', query_delay=0.25)
+    #device = rm.open_resource('USB0::62700::60984::SDSMMGKC6R0277::0::INSTR',query_delay=0.25)
+    #device = rm.open_resource('TCPIP::192.168.1.128::INSTR', query_delay=0.25)
+    device = rm.open_resource('TCPIP::10.10.10.163::INSTR', query_delay=0.25)
 
 except Exception:
     print('      Failed to connect to oscilloscope')
     sys.exit(0)
-device.timeout = 10000
+device.timeout = 20000
 
 
 def setupScope():
@@ -117,17 +125,17 @@ def setupScope():
 
     setTrigger(CHANNEL_LIST[1].id, 200)
 
-    for i in range(len(CHANNEL_LIST)):
+    for i, _ in enumerate(CHANNEL_LIST):
         if CHANNEL_LIST[i].enabled is True:
             configureChannel(
                 CHANNEL_LIST[i].id, CHANNEL_LIST[i].attn, CHANNEL_LIST[i].offset, CHANNEL_LIST[i].unit)
             time.sleep(0.1)
 
 
-def captureAllSingle(Samples, Time_Scale):
+def captureAllSingle(Samples, Time_Scale, Offset):
     start_time = time.perf_counter()
 
-    configureScopeHorizontalAxis(Time_Scale)
+    configureScopeHorizontalAxis(Time_Scale, Offset)
     TIME_INFO.sparsing = setSparsing(Samples, Time_Scale)
 
     # Setup waveform capture
@@ -137,16 +145,16 @@ def captureAllSingle(Samples, Time_Scale):
     time.sleep(1)
     device.write('ARM')
     device.write('WAIT')
-    time.sleep(1)
+    time.sleep(2)
 
     ################# Capture Data #################
     VOLTAGE_WAVEFORM = []
     error_counts = 0
 
-    while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts == 0)):
+    while ((len(VOLTAGE_WAVEFORM) == 0) & (error_counts < 2)):
         collectOscilloscopeData()
-        VOLTAGE_WAVEFORM = CHANNEL_LIST[0].data
-        if (len(CHANNEL_LIST[0].data) == 0):
+        VOLTAGE_WAVEFORM = CHANNEL_LIST[3].binarydata
+        if (len(CHANNEL_LIST[0].binarydata) == 0):
             print(
                 f'Missed Data: Error - {error_counts}, Length - {len(VOLTAGE_WAVEFORM)}')
             error_counts += 1
@@ -156,85 +164,74 @@ def captureAllSingle(Samples, Time_Scale):
 
     if (output.capturerawlength != 0):
         ################# Process Waveform #################
+        output_raw = oscilloscoperawdata()
+        
         TIME_AXIS = createTimeArray(
             output.capturerawlength, TIME_INFO.div, TIME_INFO.delay, TIME_INFO.sparsing)
 
         # Trim to length of one cycle
         [idx_start, _] = findClosestValue(TIME_AXIS, 0)
         [idx_end, _] = findClosestValue(TIME_AXIS, (Time_Scale/1000))
+        output_raw.time_array = np.array(TIME_AXIS[idx_start:idx_end])
+        output.capturetrimlength = len(output_raw.time_array)
 
-        VOLTAGE_RESULT = processBinaryData(
-            CHANNEL_LIST[0].data, CHANNEL_LIST[0].div, CHANNEL_LIST[0].offset)
-        CURRENT_RESULT = processBinaryData(
-            CHANNEL_LIST[1].data, CHANNEL_LIST[1].div, CHANNEL_LIST[1].offset)
-        VOLT_IN_RESULT = processBinaryData(
-            CHANNEL_LIST[2].data, CHANNEL_LIST[2].div, CHANNEL_LIST[2].offset)
-        AMP_IN_RESULT = processBinaryData(
-            CHANNEL_LIST[3].data, CHANNEL_LIST[3].div, CHANNEL_LIST[3].offset)
-
-        TIME_AXIS = np.array(TIME_AXIS[idx_start:idx_end])
-        VOLTAGE_RESULT = np.array(VOLTAGE_RESULT[idx_start:idx_end])
-        CURRENT_RESULT = np.array(CURRENT_RESULT[idx_start:idx_end])
-        VOLT_IN_RESULT = np.array(VOLT_IN_RESULT[idx_start:idx_end])
-        AMP_IN_RESULT = np.array(AMP_IN_RESULT[idx_start:idx_end])*10
-        POWER_RESULT = np.multiply(VOLTAGE_RESULT, CURRENT_RESULT)
-        POWER_IN_RESULT = np.multiply(VOLT_IN_RESULT, AMP_IN_RESULT)
-
-        output_raw = oscilloscoperawdata()
-        output_raw.time_array = TIME_AXIS
-        output_raw.voltout_array = VOLTAGE_RESULT
-        output_raw.ampout_array = CURRENT_RESULT
-        output_raw.powerout_array = POWER_RESULT
-        output_raw.voltin_array = VOLT_IN_RESULT
-        output_raw.ampin_array = AMP_IN_RESULT
-        output_raw.powerin_array = POWER_IN_RESULT
-
-        output.capturetrimlength = len(output_raw.voltin_array)
-        output.errorpct = abs(
-            round((Time_Scale/1000 - output_raw.time_array[-1])/(Time_Scale/1000)*100, 2))
-
-        output.voltin_max = round(
-            float(np.percentile(output_raw.voltin_array, 99)), 2)
-        output.voltin_min = round(
-            float(np.percentile(output_raw.voltin_array, 1)), 2)
-        output.voltin_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.voltin_array))), 3)
-        output.voltin_av = round(float(np.average(output_raw.voltin_array)), 3)
-
-        output.ampin_max = round(
-            float(np.percentile(output_raw.ampin_array, 99)), 3)
-        output.ampin_min = round(
-            float(np.percentile(output_raw.ampin_array, 1)), 3)
-        output.ampin_av = round(
-            float(np.average(output_raw.ampin_array)), 3)
-
-        output.powerin_max = round(
-            float(np.percentile(output_raw.powerin_array, 99)), 2)
-        output.powerin_min = round(
-            float(np.percentile(output_raw.powerin_array, 1)), 2)
-        output.powerin_av = round(
-            float(np.average(output_raw.powerin_array)), 3)
-
-        output.voltout_pk = round(
-            float(np.percentile(output_raw.voltout_array, 99)), 2)
-        output.voltout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.voltout_array))), 2)
-        output.voltout_av = round(
-            float(np.average(np.absolute(output_raw.voltout_array))), 3)
+        # Convert channel data into type data
+        for i, dataid in enumerate(CHANNEL_LIST):
+            dataid.data = processBinaryData(dataid.binarydata, dataid.div, dataid.offset)
+            if (dataid.name == "VOLT_OUT" and dataid.enabled is True):
+                #VOLTAGE_RESULT = CHANNEL_LIST[i].data
+                #output_raw.voltout_array = np.array(VOLTAGE_RESULT[idx_start:idx_end])
+                output_raw.voltout_array = np.array(CHANNEL_LIST[i].data[idx_start:idx_end])
+            elif (dataid.name == "AMP_OUT" and dataid.enabled is True):
+                #CURRENT_RESULT = CHANNEL_LIST[i].data
+                #output_raw.ampout_array = np.array(CURRENT_RESULT[idx_start:idx_end])
+                output_raw.ampout_array = np.array(CHANNEL_LIST[i].data[idx_start:idx_end])
+            elif (dataid.name == "VOLT_IN" and dataid.enabled is True):
+                #VOLT_IN_RESULT = CHANNEL_LIST[i].data
+                #output_raw.voltin_array = np.array(VOLT_IN_RESULT[idx_start:idx_end])
+                output_raw.voltin_array = np.array(CHANNEL_LIST[i].data[idx_start:idx_end])
+            elif (dataid.name == "AMP_IN" and dataid.enabled is True):
+                #AMP_IN_RESULT = CHANNEL_LIST[i].data 
+                #output_raw.ampin_array = np.array(AMP_IN_RESULT[idx_start:idx_end])
+                output_raw.ampin_array = np.array(CHANNEL_LIST[i].data[idx_start:idx_end])
+            elif (dataid.name == "ENCODER" and dataid.enabled is True):
+                #ENCODER_RESULT = CHANNEL_LIST[i].data     
+                #output_raw.encoder_array = np.array(ENCODER_RESULT[idx_start:idx_end])
+                output_raw.encoder_array = np.array(CHANNEL_LIST[i].data[idx_start:idx_end])
         
-        output.ampout_pk = round(
-            float(np.percentile(output_raw.ampout_array, 99)), 2)
-        output.ampout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.ampout_array))), 3)
-        output.ampout_av = round(
-            float(np.average(np.absolute(output_raw.ampout_array))), 3)
+        # Only calculate power out if both voltage and current outputs are measured
+        if (len(output_raw.voltout_array) > 0 and len(output_raw.ampout_array) > 0):
+            output_raw.powerout_array = np.multiply(output_raw.voltout_array, output_raw.ampout_array)
 
-        output.powerout_pk = round(
-            float(np.percentile(output_raw.powerout_array, 99)), 2)
-        output.powerout_rms = round(
-            np.sqrt(np.mean(np.square(output_raw.powerout_array))), 3)
-        output.powerout_av = round(
-            float(np.average(output_raw.powerout_array)*2), 2)
+        # Only calculate power in if both voltage and current inputs are measured
+        if (len(output_raw.voltin_array) > 0 and len(output_raw.ampin_array) > 0):
+            output_raw.powerin_array = np.multiply(output_raw.voltin_array, output_raw.ampout_array)
+
+        # Process Voltin Array
+        if (len(output_raw.voltin_array) > 0):
+            output.voltin_max, output.voltin_min, output.voltin_rms, output.voltin_av = calculateCharacteristics(output_raw.voltin_array)
+
+        # Process Ampin Array
+        if (len(output_raw.ampin_array) > 0):
+            output.ampin_max, output.ampin_min, output.ampin_rms, output.ampin_av = calculateCharacteristics(output_raw.ampin_array)
+
+        # Process Powerin Array
+        if (len(output_raw.powerin_array) > 0):
+            output.powerin_max, output.powerin_min, _, output.powerin_av = calculateCharacteristics(output_raw.powerin_array)
+
+        # Process Voltout Array
+        if (len(output_raw.voltout_array) > 0):
+            output.voltout_max, _, output.voltout_rms, output.voltout_av = calculateCharacteristics(output_raw.voltout_array)
+
+        # Process Ampin Array
+        if (len(output_raw.ampout_array) > 0):
+            output.ampout_max, _, output.ampout_rms, output.ampout_av = calculateCharacteristics(output_raw.ampout_array)
+
+        # Process Powerout Array
+        if (len(output_raw.powerout_array) > 0):
+            output.powerout_max, _, output.powerout_rms, output.powerout_av = calculateCharacteristics(output_raw.powerout_array)
+
+        output.speed_max, output.speed_min, output.speed_av, output.speed_stdev, output.distance_error, output.microstep_error = processEncoder(output_raw.encoder_array, output_raw.time_array)
 
         output.capturetime = round(time.perf_counter() - start_time, 2)
 
@@ -246,11 +243,23 @@ def captureAllSingle(Samples, Time_Scale):
 
     return output, output_raw
 
+def calculateCharacteristics(array):
+    if (len(array) > 0):
+        array_max = round(float(np.percentile(array, 99)), 2)
+        array_min = round(float(np.percentile(array, 1)), 2)
+        array_rms = round(np.sqrt(np.mean(np.square(array))), 3)
+        array_av = round(float(np.average(array)), 3)
+    else:
+        array_max = 0
+        array_min = 0
+        array_rms = 0
+        array_av = 0
+    return array_max, array_min, array_rms, array_av
 
 def collectOscilloscopeData():
 
     # send capture to controller
-    for i in range(len(CHANNEL_LIST)):
+    for i, _ in enumerate(CHANNEL_LIST):
         if (CHANNEL_LIST[i].enabled is True):
             device.write(f'C{CHANNEL_LIST[i].id}:WAVEFORM? DAT2')
 
@@ -258,13 +267,13 @@ def collectOscilloscopeData():
     device.chunk_size = 1024*1024*1024
 
     # read capture from controller
-    for i in range(len(CHANNEL_LIST)):
+    for i, _ in enumerate(CHANNEL_LIST):
         if (CHANNEL_LIST[i].enabled is True):
-            CHANNEL_LIST[i].data = device.query_binary_values(str.format(
+            CHANNEL_LIST[i].binarydata = device.query_binary_values(str.format(
                 f'C{CHANNEL_LIST[i].id}:WAVEFORM? DAT2'), datatype='s', is_big_endian=False)
 
 
-def configureScopeHorizontalAxis(CaptureTime_us):
+def configureScopeHorizontalAxis(CaptureTime_us, Offset):
     # Supported Configurations for Siglent SDS1104
     TimePerDivisionOptions_us = [1, 2, 5, 10, 20, 50, 100,
                                  200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]
@@ -277,13 +286,13 @@ def configureScopeHorizontalAxis(CaptureTime_us):
         TimePerDivisionOptions_us, TimePerDivisionRaw_us)
 
     # Set Trigger Delay so T=0 is on left of screen
-    TriggerDelay_us = -TimePerDivision_us*7
+    TriggerDelay_us = -TimePerDivision_us*7 + Offset
     # Write configuration parameters to Oscilloscope if changed
     if (TimePerDivision_us != TIME_INFO.div):
         device.write(f'TIME_DIV {TimePerDivision_us}US')
         device.write(f'TRIG_DELAY {TriggerDelay_us}US')
         TIME_INFO.div = TimePerDivision_us
-        TIME_INFO.delay = TriggerDelay_us
+        TIME_INFO.delay = TriggerDelay_us - Offset
 
 
 def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
@@ -306,21 +315,81 @@ def configureScopeVerticalAxis(inputVoltage, targetCurrentRms):
     updateOFFSET(CHANNEL_LIST[2], VoltsOffset_inV)
 
     # INPUT AMPS - Calculate peak amps
-    AmpsPerDivision_inA = math.ceil(targetCurrentRms*1.4*1.5/4)
-    updateVDIV(CHANNEL_LIST[3], AmpsPerDivision_inA)
+    #AmpsPerDivision_inA = math.ceil(targetCurrentRms*1.4*1.5/4)
+    #updateVDIV(CHANNEL_LIST[3], AmpsPerDivision_inA)
 
 ###################### Support Functions ######################
 
+def processEncoder(enc, time):
+    encoder_max = round(float(np.percentile(enc, 99)), 3)
+    encoder_min = round(float(np.percentile(enc, 1)), 3)
+
+    indexlist = []
+    preval = 0
+    upper = (encoder_max - encoder_min)*3/4 + encoder_min
+    lower = (encoder_max - encoder_min)*1/4 + encoder_min
+
+    for i, val in enumerate(enc):
+        if (val > upper) & (preval == 0):
+            indexlist.append(i)
+            preval = 1
+        elif ((val < lower) & (preval == 1)):
+            indexlist.append(i)
+            preval = 0
+
+    indexlist.sort()
+    timevalues = []
+    distancevalues = []
+    for i, val in enumerate(indexlist):
+        timevalues.append(round(float(time[val]*1000), 2))
+        distancevalues.append(i*40/4000)
+
+    timeintervals = []
+    speedintervals = []
+    timeplot = []
+    totaltime = 0
+    for i, _ in enumerate(timevalues):
+        if (i > 2):
+            interval = timevalues[i] - timevalues[i-1]
+            timeplot.append((timevalues[i] + timevalues[i-1])/2)
+            timeintervals.append(round(interval, 1))
+            speedintervals.append(round(10000/interval, 1))
+
+    speed_min = round(np.min(speedintervals), 1)
+    speed_max = round(np.max(speedintervals), 1)
+    speed_av = round(float(10000/np.average(timeintervals)), 1)
+    speed_stdev = round(float(np.std(speedintervals)), 1)
+
+    errordistance = []
+    for i, val in enumerate(timevalues):
+        targetdistance = val/1000000 * speed_av
+        actualdistance = distancevalues[i]
+        errordistance.append(abs(actualdistance - targetdistance))
+
+    distance_error = round(np.max(errordistance), 4)
+    microstep_error = round(distance_error/(40/(200*16)), 1)
+    print("")
+    print(f'Distance Error: {distance_error}, 16ms Error: {microstep_error}')
+    print("")
+    return speed_max, speed_min, speed_av, speed_stdev, distance_error, microstep_error
 
 def setTrigger(ChannelID, LevelmV):
     # Set Trigger Mode
-    device.write('TRIG_MODE NORMAL')
+    device.write('TRIG_MODE NORM')
     # Set Trigger Level to 0V
     device.write(f'C{ChannelID}:TRIG_LEVEL {LevelmV}mV')
+
     # Set Trigger Coupling to AC
-    device.write(f'C{ChannelID}:TRIG_COUPLING DC')
+    device.write(f'C{ChannelID}:TRIG_COUPLING HFREJ')
     # Set Trigger Select to EDGE and Current Channel
     device.write(f'TRIG_SELECT EDGE, SR, C{ChannelID}')
+
+    #device.write(f'C{ChannelID}:TRIG_LEVEL2 -50mV')
+    #device.write(f'TRIG_SELECT SLEW, SR, C{ChannelID}, HT, IL, HV, 1E-05s')
+
+    #device.write(f'C{ChannelID}:TRIG_LEVEL2 10mV')
+    #device.write(f'TRIG_SELECT SLOPE, SR, C{ChannelID}, HT, IS, HV, 4E-05s')
+
     # Set Trigger Slope Positive
     device.write(f'C{ChannelID}:TRIG_SLOPE POS')
 
@@ -337,7 +406,7 @@ def configureChannel(ChannelID, Attenuation, OffsetV, Unit):
 
 
 def initializeChannels(channel_list):
-    for i in range(len(channel_list)):
+    for i, _ in enumerate(channel_list):
         if (channel_list[i].enabled is False):
             device.write(f'C{channel_list[i].id}:TRACE OFF')
         else:
@@ -440,7 +509,7 @@ def processBinaryData(Waveform, Div, Offset):
             result.append((item - 255) * (Div/25) - Offset)
         else:
             result.append(item * Div/25 - Offset)
-    return result
+    return np.array(result)
 
 # def parameterMeasureStart():
 #     # Set Up Voltage Measurement

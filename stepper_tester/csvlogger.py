@@ -44,7 +44,7 @@ def writeoscilloscopedata(testiddata, raw):
 
     header = tuple(field.name for field in fields(raw))
     array = np.transpose(np.stack((raw.time_array, raw.voltin_array, raw.ampin_array,
-                         raw.powerin_array, raw.voltout_array, raw.ampout_array, raw.powerout_array), axis=0))
+                         raw.powerin_array, raw.voltout_array, raw.ampout_array, raw.powerout_array, raw.encoder_array, raw.encoder_ref_array), axis=0))
 
     DF = pd.DataFrame(data=array, columns=header)
     DF.to_parquet(f'/{filepath}{filename}.parquet')

@@ -29,10 +29,10 @@ def plotosData(alldata, array, type):
     if (type == 'Out'):
         ax1.plot(array.time_array, array.voltout_array, linewidth=0.5, label="Voltage")
         ax2.plot(array.time_array, array.ampout_array, linewidth=0.5, label="Current", color="orange")
-        ax3.plot(array.time_array, array.powerout_array, linewidth=0.5, label="Power", color="red")
-        ax1.set_ylim(-80, 80)
-        ax2.set_ylim(-4, 4)
-        ax3.set_ylim(-160, 160)
+        #ax3.plot(array.time_array, array.powerout_array, linewidth=0.5, label="Power", color="red")
+        ax1.set_ylim(-60, 60)
+        ax2.set_ylim(-3, 3)
+        #ax3.set_ylim(-160, 160)
     elif (type == 'In'):
         halfcycle = round(len(array.time_array)/2)
         ax1.plot(array.time_array[:halfcycle], np.abs(array.voltout_array[:halfcycle]), linewidth=0.5, label="Stepper Voltage", color="orange")
@@ -46,7 +46,7 @@ def plotosData(alldata, array, type):
     ax1.set_ylabel("Volts")
 
     ax2.set_ylabel("Amps")
-    ax3.set_ylabel("Power")
+    #ax3.set_ylabel("Power")
 
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
